@@ -1,0 +1,34 @@
+--- OpenOCD demo output (captured 2026-03-20, VFireSim PID 1241878) ---
+
+$ openocd -f docs/bridge_llm_testing/openocd_rbb_dmi.cfg
+
+Open On-Chip Debugger 0.12.0
+Licensed under GNU GPL v2
+For bug reports, read
+	http://openocd.org/doc/doxygen/bugs.html
+Info : only one transport option; autoselect 'jtag'
+Info : Initializing remote_bitbang driver
+Info : Connecting to localhost:23000
+Info : remote_bitbang driver initialized
+Info : This adapter doesn't support configurable speed
+Info : JTAG tap: riscv.cpu tap/device found: 0x10000001 (mfg: 0x000 (<invalid>), part: 0x0000, ver: 0x1)
+Info : datacount=2 progbufsize=16
+Info : Disabling abstract command reads from CSRs.
+Info : Examined RISC-V core; found 1 harts
+Info :  hart 0: XLEN=64, misa=0x800000000094112d
+Target examined successfully
+Info : starting gdb server for riscv.cpu on 3333
+Info : Listening on port 3333 for gdb connections
+OpenOCD initialized, halting target...
+Target halted.
+Demo complete. OpenOCD is running.
+Info : Listening on port 6666 for tcl connections
+Info : Listening on port 4444 for telnet connections
+
+--- Key results ---
+- IDCODE correctly matched:  0x10000001
+- DMI discovered:            datacount=2 progbufsize=16
+- Core examined:             1 hart, XLEN=64
+- MISA:                      0x800000000094112d (RV64IMAFD + supervisor mode)
+- Target halted successfully
+- GDB server listening on port 3333
