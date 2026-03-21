@@ -12,13 +12,13 @@ import firesim.lib.bridgeutils._
 
 import firechip.bridgeinterfaces._
 
-class DMIBridge(memoryRegionNameOpt: Option[String], addrBits: Int)
+class DMIBridge(memoryRegionNameOpt: Option[String], addrBits: Int, useRbbDmi: Boolean = false)
     extends BlackBox
     with Bridge[HostPortIO[DMIBridgeTargetIO]] {
   val moduleName = "firechip.goldengateimplementations.DMIBridgeModule"
   val io             = IO(new DMIBridgeTargetIO(addrBits))
   val bridgeIO = HostPort(io)
-  val constructorArg = Some(DMIBridgeParams(memoryRegionNameOpt, addrBits: Int))
+  val constructorArg = Some(DMIBridgeParams(memoryRegionNameOpt, addrBits: Int, useRbbDmi))
   generateAnnotations()
 }
 
@@ -29,9 +29,10 @@ object DMIBridge {
     memoryRegionNameOpt: Option[String],
     reset:               Bool,
     addrBits:            Int,
+    useRbbDmi:           Boolean = false,
   )(implicit p:          Parameters
   ): DMIBridge = {
-    val ep = Module(new DMIBridge(memoryRegionNameOpt, addrBits))
+    val ep = Module(new DMIBridge(memoryRegionNameOpt, addrBits, useRbbDmi))
     // TODO: Check following IOs are same size/names/etc
     // req into target, resp out of target
     port.dmi.req     <> ep.io.debug.req

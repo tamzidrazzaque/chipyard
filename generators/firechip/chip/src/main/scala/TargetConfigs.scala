@@ -12,7 +12,7 @@ import freechips.rocketchip.tile._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.devices.tilelink.{BootROMLocated}
-import freechips.rocketchip.devices.debug.{DebugModuleKey}
+import freechips.rocketchip.devices.debug.{DebugModuleKey, DefaultDebugModuleParams}
 import freechips.rocketchip.prci.{AsynchronousCrossing}
 import testchipip.cosim.{TracePortKey}
 import icenet._
@@ -265,21 +265,22 @@ class FireSimLargeBoomAndRocketConfig extends Config(
 
 //******************************************************************
 // Gemmini NN accel config, base off chipyard's GemminiRocketConfig
+// NOTE: Disabled - requires gemmini submodule (not initialized)
 //******************************************************************
-class FireSimGemminiRocketConfig extends Config(
-  new WithDefaultFireSimBridges ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.GemminiRocketConfig)
-
-class FireSimLeanGemminiRocketConfig extends Config(
-  new WithDefaultFireSimBridges ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.LeanGemminiRocketConfig)
-
-class FireSimLeanGemminiPrintfRocketConfig extends Config(
-  new WithDefaultFireSimBridges ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.LeanGemminiPrintfRocketConfig)
+// class FireSimGemminiRocketConfig extends Config(
+//   new WithDefaultFireSimBridges ++
+//   new WithFireSimConfigTweaks ++
+//   new chipyard.GemminiRocketConfig)
+//
+// class FireSimLeanGemminiRocketConfig extends Config(
+//   new WithDefaultFireSimBridges ++
+//   new WithFireSimConfigTweaks ++
+//   new chipyard.LeanGemminiRocketConfig)
+//
+// class FireSimLeanGemminiPrintfRocketConfig extends Config(
+//   new WithDefaultFireSimBridges ++
+//   new WithFireSimConfigTweaks ++
+//   new chipyard.LeanGemminiPrintfRocketConfig)
 
 //**********************************************************************************
 // Supernode Configurations, base off chipyard's RocketConfig
@@ -292,11 +293,12 @@ class SupernodeFireSimRocketConfig extends Config(
 
 //**********************************************************************************
 //* CVA6 Configurations
+// NOTE: Disabled - requires cva6 submodule (not initialized)
 //*********************************************************************************/
-class FireSimCVA6Config extends Config(
-  new WithDefaultFireSimBridges ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.CVA6Config)
+// class FireSimCVA6Config extends Config(
+//   new WithDefaultFireSimBridges ++
+//   new WithFireSimConfigTweaks ++
+//   new chipyard.CVA6Config)
 
 //**********************************************************************************
 // System with 16 LargeBOOMs that can be simulated with Golden Gate optimizations
@@ -321,18 +323,20 @@ class FireSimRocketMMIOOnlyConfig extends Config(
   new WithFireSimConfigTweaks ++
   new chipyard.RocketConfig)
 
-class FireSimLeanGemminiRocketMMIOOnlyConfig extends Config(
-  new WithDefaultMMIOOnlyFireSimBridges ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.LeanGemminiRocketConfig)
+// NOTE: Disabled - requires gemmini submodule (not initialized)
+// class FireSimLeanGemminiRocketMMIOOnlyConfig extends Config(
+//   new WithDefaultMMIOOnlyFireSimBridges ++
+//   new WithFireSimConfigTweaks ++
+//   new chipyard.LeanGemminiRocketConfig)
 
-class FireSimRadianceClusterSynConfig extends Config(
-  new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
-  new chipyard.config.WithNoTraceIO ++
-  new WithDefaultFireSimBridges ++
-  new chipyard.config.WithRadBootROM ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.RadianceClusterSynConfig)
+// NOTE: Disabled - requires radiance submodule (not initialized)
+// class FireSimRadianceClusterSynConfig extends Config(
+//   new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
+//   new chipyard.config.WithNoTraceIO ++
+//   new WithDefaultFireSimBridges ++
+//   new chipyard.config.WithRadBootROM ++
+//   new WithFireSimConfigTweaks ++
+//   new chipyard.RadianceClusterSynConfig)
 
 class FireSimLargeBoomCospikeConfig extends Config(
   new WithCospikeBridge ++
@@ -352,3 +356,19 @@ class FireSimLargeBoomSV39CospikeConfig extends Config(
   new WithFireSimConfigTweaks++
   new freechips.rocketchip.rocket.WithSV39 ++
   new chipyard.LargeBoomV3Config)
+
+//**********************************************************************************
+// RBB-DMI config: OpenOCD connects via remote_bitbang TCP to a JTAG-to-DMI
+// translator that drives the target's DMI debug interface directly.
+// WithFireSimConfigTweaks includes WithNoDebug; we override DebugModuleKey here
+// (higher priority = leftmost in CDE) to re-enable the debug module.
+//**********************************************************************************
+class FireSimRBBDmiRocketConfig extends Config(
+  new chipyard.harness.WithSerialTLTiedOff ++
+  new WithRBBDMIBridge ++
+  new WithDefaultFireSimBridges ++
+  new org.chipsalliance.cde.config.Config((site, here, up) => {
+    case DebugModuleKey => Some(DefaultDebugModuleParams(64))
+  }) ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.dmiRocketConfig)

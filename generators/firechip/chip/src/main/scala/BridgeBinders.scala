@@ -89,6 +89,14 @@ class WithDMIBridge extends HarnessBinder({
   }
 })
 
+// Alternative DMI bridge that accepts JTAG bitbang connections from OpenOCD via remote_bitbang TCP server
+class WithRBBDMIBridge extends HarnessBinder({
+  case (th: FireSim, port: DMIPort, chipId: Int) => {
+    val nDMIAddrBits = port.io.dmi.req.bits.addr.getWidth
+    DMIBridge(th.harnessBinderClock, port.io, None, th.harnessBinderReset.asBool, nDMIAddrBits, useRbbDmi = true)(th.p)
+  }
+})
+
 class WithNICBridge extends HarnessBinder({
   case (th: FireSim, port: NICPort, chipId: Int) => {
     NICBridge(port.io.clock, port.io.bits)(th.p)

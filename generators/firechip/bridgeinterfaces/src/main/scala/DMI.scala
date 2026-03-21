@@ -12,7 +12,7 @@ import chisel3.util.{DecoupledIO}
   * the backing AXI4 memory is present, then memoryRegionNameOpt should be set to the same memory region name which is
   * passed to the FASEDBridge. This enables fast payload loading in firesim-fesvr through the loadmem unit.
   */
-case class DMIBridgeParams(memoryRegionNameOpt: Option[String], addrBits: Int)
+case class DMIBridgeParams(memoryRegionNameOpt: Option[String], addrBits: Int, useRbbDmi: Boolean = false)
 
 //import freechips.rocketchip.devices.debug.{ClockedDMIIO, DMIReq, DMIResp}
 object DMIConsts{

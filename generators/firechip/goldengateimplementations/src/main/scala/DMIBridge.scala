@@ -64,20 +64,23 @@ class DMIBridgeModule(dmiBridgeParams: DMIBridgeParams)(implicit p: Parameters)
     genCRFile()
 
     override def genHeader(base: BigInt, memoryRegions: Map[String, BigInt], sb: StringBuilder): Unit = {
-      val memoryRegionNameOpt = dmiBridgeParams.memoryRegionNameOpt
-      val offsetConst         = memoryRegionNameOpt.map(memoryRegions(_)).getOrElse(BigInt(0))
-
-      genConstructor(
-        base,
-        sb,
-        "dmibridge_t",
-        "dmibridge",
-        Seq(
-          CppBoolean(dmiBridgeParams.memoryRegionNameOpt.isDefined),
-          UInt64(offsetConst),
-        ),
-        hasLoadMem = true,
-      )
+      if (dmiBridgeParams.useRbbDmi) {
+        genConstructor(base, sb, "rbb_dmi_bridge_t", "rbb_dmi_bridge")
+      } else {
+        val memoryRegionNameOpt = dmiBridgeParams.memoryRegionNameOpt
+        val offsetConst         = memoryRegionNameOpt.map(memoryRegions(_)).getOrElse(BigInt(0))
+        genConstructor(
+          base,
+          sb,
+          "dmibridge_t",
+          "dmibridge",
+          Seq(
+            CppBoolean(dmiBridgeParams.memoryRegionNameOpt.isDefined),
+            UInt64(offsetConst),
+          ),
+          hasLoadMem = true,
+        )
+      }
     }
   }
 }
