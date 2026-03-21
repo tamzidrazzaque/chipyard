@@ -139,7 +139,7 @@ riscv64-unknown-elf-gdb /tmp/spin.elf \
 
 ## Evidence That It Works
 
-The `demo_output.log` in this directory contains the exact OpenOCD session output. Key evidence:
+The `demo_output.txt` in this directory contains the exact OpenOCD session output. Key evidence:
 
 ```
 JTAG tap: riscv.cpu tap/device found: 0x10000001   <- IDCODE matched
@@ -206,4 +206,4 @@ OpenOCD (external)
 | `openocd_rbb_dmi.cfg` | OpenOCD configuration for the demo |
 | `spin.S` | Minimal RISC-V test program (infinite loop with a0=42) |
 | `spin.ld` | Linker script placing the test at 0x80000000 |
-| `demo_output.log` | Exact OpenOCD output from the successful demo run |
+| `demo_output.txt` | Exact OpenOCD output from the successful demo run |
