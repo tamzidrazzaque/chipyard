@@ -207,3 +207,96 @@ OpenOCD (external)
 | `spin.S` | Minimal RISC-V test program (infinite loop with a0=42) |
 | `spin.ld` | Linker script placing the test at 0x80000000 |
 | `demo_output.txt` | Exact OpenOCD output from the successful demo run |
+
+---
+
+## Running on AWS F2 FPGA
+
+### Prerequisites: sims/firesim submodule version
+
+The `bridge_llm_testing` branch pins `sims/firesim` to official FireSim `be558e3f9` (official/main), which is the first FireSim commit that includes full F2 support:
+- `deploy/bit-builder-recipes/f2.yaml` (`F2BitBuilder`)
+- `sim/midas/src/main/scala/configs/CompilerConfigs.scala`: `BaseF2Config`
+- `deploy/buildtools/bitbuilder.py`: `F2BitBuilder` class
+- `deploy/run-farm-recipes/aws_ec2.yaml`: `AWSEC2F2` run farm type
+
+GoldenGate re-elaboration with `BaseF2Config` has been verified successful (see commit message in submodule update). The generated `FireSim-generated.const.h` correctly instantiates `rbb_dmi_bridge_t` with F2's 64 GiB DRAM model.
+
+### Step 1: Local deploy config setup (gitignored, do once)
+
+The following changes to `sims/firesim/deploy/` are gitignored by FireSim (they are user-local configs). Apply them after `git submodule update --init sims/firesim`:
+
+**`sims/firesim/deploy/config_build_recipes.yaml`** — add this recipe:
+```yaml
+firesim_rbb_dmi_rocket_f2:
+    PLATFORM: f2
+    TARGET_PROJECT: firechip
+    TARGET_PROJECT_MAKEFRAG: null
+    DESIGN: FireSim
+    TARGET_CONFIG: FireSimRBBDmiRocketConfig
+    PLATFORM_CONFIG: BaseF2Config
+    deploy_quintuplet: null
+    platform_config_args:
+        fpga_frequency: 90
+        build_strategy: TIMING
+    post_build_hook: null
+    metasim_customruntimeconfig: null
+    bit_builder_recipe: bit-builder-recipes/f2.yaml
+```
+
+**`sims/firesim/deploy/config_build.yaml`** — set `builds_to_run: [firesim_rbb_dmi_rocket_f2]`
+
+**`sims/firesim/deploy/config_runtime.yaml`** — set `default_hw_config: firesim_rbb_dmi_rocket_f2`
+
+**`sims/firesim/deploy/config_hwdb.yaml`** — fill in `agfi` after build completes.
+
+### Step 2: S3 bucket setup
+
+```bash
+# awsinit creates the required S3 bucket: firesim-<accountId>-<region>
+# e.g. firesim-260905118414-us-east-1
+cd sims/firesim && source sourceme-manager.sh && firesim awsinit
+```
+
+### Step 3: Build the F2 bitstream (overnight, ~8-12 hours)
+
+```bash
+cd sims/firesim
+source sourceme-manager.sh
+firesim buildbitstream
+# This launches a z1d.2xlarge build farm EC2 instance, runs Vivado,
+# packages the AGFI, and registers it in AWS.
+```
+
+When complete, note the AGFI ID printed by the manager (format: `agfi-XXXXXXXXXXXXXXXXX`), then update `config_hwdb.yaml`:
+```yaml
+firesim_rbb_dmi_rocket_f2:
+    agfi: agfi-XXXXXXXXXXXXXXXXX   # fill in here
+    deploy_quintuplet_override: null
+    deploy_makefrag_override: null
+    custom_runtime_config: null
+```
+
+### Step 4: Launch on F2 and attach OpenOCD
+
+```bash
+# Launch an f2.6xlarge run farm instance and flash the AGFI
+firesim launchrunfarm
+firesim infrasetup
+firesim deploy  # with custom plusargs: +rbb-dmi-port=23000
+
+# SSH into the F2 run farm host
+# OpenOCD config is the same as the Verilator demo
+openocd -f docs/bridge_llm_testing/openocd_rbb_dmi.cfg
+```
+
+### Key differences vs Verilator demo
+
+| Aspect | Verilator | F2 FPGA |
+|--------|-----------|---------|
+| Simulation speed | ~2 MHz | ~25 MHz (12x faster) |
+| DRAM model | FASED timing model | Real DDR5 on board |
+| DRAM capacity | 16 GiB (simulated) | 64 GiB (physical) |
+| Clock domain | Single domain | Same (FAME-1) |
+| rbb_dmi_bridge_t | Identical | Identical |
+| OpenOCD config | Identical | Identical |
