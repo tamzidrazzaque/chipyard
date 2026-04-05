@@ -372,3 +372,20 @@ class FireSimRBBDmiRocketConfig extends Config(
   }) ++
   new WithFireSimConfigTweaks ++
   new chipyard.dmiRocketConfig)
+
+//**********************************************************************************
+// Direct JTAG config: Exposes the target's JTAG DTM through a FireSim bridge.
+// Requires the posedge-only JTAG TAP patch (no negedge clock_falling) to be
+// compatible with FAME-1 transformation.
+// The target uses the standard Rocket JTAG DTM; OpenOCD connects via
+// remote_bitbang through the JTAGBridge.
+//**********************************************************************************
+class FireSimDirectJTAGRocketConfig extends Config(
+  new chipyard.harness.WithSerialTLTiedOff ++
+  new WithJTAGBridge ++
+  new WithDefaultFireSimBridges ++
+  new org.chipsalliance.cde.config.Config((site, here, up) => {
+    case DebugModuleKey => Some(DefaultDebugModuleParams(64).copy(clockGate = false))
+  }) ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.RocketConfig)

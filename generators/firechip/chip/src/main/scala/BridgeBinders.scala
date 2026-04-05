@@ -97,6 +97,14 @@ class WithRBBDMIBridge extends HarnessBinder({
   }
 })
 
+// Direct JTAG bridge: drives the target's JTAG port (TCK/TMS/TDI/TDO) via
+// remote_bitbang, bypassing the DMI shim entirely.
+class WithJTAGBridge extends HarnessBinder({
+  case (th: FireSim, port: JTAGPort, chipId: Int) => {
+    JTAGBridge(th.harnessBinderClock, port.io, th.harnessBinderReset.asBool)(th.p)
+  }
+})
+
 class WithNICBridge extends HarnessBinder({
   case (th: FireSim, port: NICPort, chipId: Int) => {
     NICBridge(port.io.clock, port.io.bits)(th.p)
