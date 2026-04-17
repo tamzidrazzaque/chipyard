@@ -77,25 +77,18 @@ remote_bitbang_t::remote_bitbang_t(uint16_t port) :
 
 void remote_bitbang_t::accept()
 {
-
-  fprintf(stderr,"Attempting to accept client socket\n");
-  int again = 1;
-  while (again != 0) {
-    client_fd = ::accept(socket_fd, NULL, NULL);
-    if (client_fd == -1) {
-      if (errno == EAGAIN) {
-        // No client waiting to connect right now.
-      } else {
-        fprintf(stderr, "failed to accept on socket: %s (%d)\n", strerror(errno),
-                errno);
-        again = 0;
-        abort();
-      }
+  client_fd = ::accept(socket_fd, NULL, NULL);
+  if (client_fd == -1) {
+    if (errno == EAGAIN) {
+      // No client waiting; return and let the simulation proceed.
     } else {
-      fcntl(client_fd, F_SETFL, O_NONBLOCK);
-      fprintf(stderr, "Accepted successfully.");
-      again = 0;
+      fprintf(stderr, "failed to accept on socket: %s (%d)\n", strerror(errno),
+              errno);
+      abort();
     }
+  } else {
+    fcntl(client_fd, F_SETFL, O_NONBLOCK);
+    fprintf(stderr, "Accepted successfully.\n");
   }
 }
 
@@ -111,6 +104,7 @@ void remote_bitbang_t::tick(
     tdo = jtag_tdo;
     execute_command();
   } else {
+    // client_fd <= 0 means no client connected; try non-blocking accept
     this->accept();
   }
 
@@ -134,25 +128,22 @@ void remote_bitbang_t::set_pins(char _tck, char _tms, char _tdi){
 void remote_bitbang_t::execute_command()
 {
   char command;
-  int again = 1;
-  while (again) {
-    ssize_t num_read = read(client_fd, &command, sizeof(command));
-    if (num_read == -1) {
-      if (errno == EAGAIN) {
-        // We'll try again the next call.
-        //fprintf(stderr, "Received no command. Will try again on the next call\n");
-      } else {
-        fprintf(stderr, "remote_bitbang failed to read on socket: %s (%d)\n",
-                strerror(errno), errno);
-        again = 0;
-        abort();
-      }
-    } else if (num_read == 0) {
-      fprintf(stderr, "No Command Received.\n");
-      again = 1;
+  ssize_t num_read = read(client_fd, &command, sizeof(command));
+  if (num_read == -1) {
+    if (errno == EAGAIN) {
+      // No data available right now; will try on next tick.
+      return;
     } else {
-      again = 0;
+      fprintf(stderr, "remote_bitbang failed to read on socket: %s (%d)\n",
+              strerror(errno), errno);
+      abort();
     }
+  } else if (num_read == 0) {
+    // Client disconnected; go back to accepting new clients.
+    fprintf(stderr, "Remote end disconnected.\n");
+    close(client_fd);
+    client_fd = -1;
+    return;
   }
 
   //fprintf(stderr, "Received a command %c\n", command);

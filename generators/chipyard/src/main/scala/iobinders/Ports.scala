@@ -45,6 +45,9 @@ case class UARTPort        (val getIO: () => UARTPortIO, val uartNo: Int, val fr
 case class SPIFlashPort    (val getIO: () => SPIChipIO, val params: SPIFlashParams, val spiId: Int)
     extends Port[SPIChipIO]
 
+case class SPIFlashPinsPort(val getIO: () => SPIPortIO, val params: SPIFlashParams, val spiId: Int)
+    extends Port[SPIPortIO]
+
 case class SPIPort         (val getIO: () => SPIPortIO)
     extends Port[SPIPortIO]
 

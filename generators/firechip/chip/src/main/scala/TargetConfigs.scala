@@ -381,11 +381,42 @@ class FireSimRBBDmiRocketConfig extends Config(
 // remote_bitbang through the JTAGBridge.
 //**********************************************************************************
 class FireSimDirectJTAGRocketConfig extends Config(
-  new chipyard.harness.WithSerialTLTiedOff ++
   new WithJTAGBridge ++
   new WithDefaultFireSimBridges ++
   new org.chipsalliance.cde.config.Config((site, here, up) => {
     case DebugModuleKey => Some(DefaultDebugModuleParams(64).copy(clockGate = false))
   }) ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.RocketConfig)
+
+//**********************************************************************************
+// GPIO Bridge validation config
+//**********************************************************************************
+class FireSimGPIORocketConfig extends Config(
+  new WithGPIOBridge ++
+  new chipyard.iobinders.WithGPIOPunchthrough ++
+  new chipyard.config.WithGPIO ++
+  new WithDefaultFireSimBridges ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.RocketConfig)
+
+//**********************************************************************************
+// Ext Interrupt Bridge validation config
+//**********************************************************************************
+class FireSimExtIntRocketConfig extends Config(
+  new WithExtIntBridge ++
+  new freechips.rocketchip.subsystem.WithNExtTopInterrupts(4) ++
+  new WithDefaultFireSimBridges ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.RocketConfig)
+
+//**********************************************************************************
+// SPI Flash Bridge validation config
+//**********************************************************************************
+class FireSimSPIFlashRocketConfig extends Config(
+  new WithSPIFlashBridge ++
+  new chipyard.iobinders.WithSPIFlashPunchthrough ++
+  new chipyard.config.WithSPIFlash(0x100000) ++
+  new WithDefaultFireSimBridges ++
   new WithFireSimConfigTweaks ++
   new chipyard.RocketConfig)

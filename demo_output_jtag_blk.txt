@@ -1,0 +1,69 @@
+=== Direct JTAG Block Device Debug Demo - Captured Output ===
+Date: Mon Apr  6 2026
+Platform: AWS F2 FPGA (f2.6xlarge)
+AGFI: agfi-06911dae2b6bf0ef7
+Config: FireSimDirectJTAGRocketConfig + BaseF2Config
+
+=== OpenOCD Connection ===
+Info : JTAG tap: riscv.cpu tap/device found: 0x00000001
+Info : datacount=2 progbufsize=16
+Info : Examined RISC-V core; found 1 harts
+Info :  hart 0: XLEN=64, misa=0x800000000094112d
+Info : Listening on port 3333 for gdb connections
+
+=== Linux Boot (from UART) ===
+[    0.266201] disk [iceblk] of loaded; 599304 sectors, 1 tags, 16 max request length
+Mounting /dev/iceblk as root device
+[    0.272910] EXT4-fs (iceblk): mounted filesystem r/w without journal.
+Loaded platform drivers, booting from disk:
+Starting syslogd: OK
+Starting klogd: OK
+Welcome to Buildroot
+buildroot login:
+
+=== GDB Initial Connection ===
+pc             0xffffffff8000370e  <arch_cpu_idle+14>
+ra             0xffffffff807b5d78  <default_idle_call+28>
+sp             0xffffffff81203da0
+
+=== Hardware Breakpoint Set ===
+breakpoint set at 0xffffffff8039db42  (blk_mq_submit_bio)
+
+=== I/O Triggered ===
+# dd if=/dev/iceblk of=/dev/null bs=4096 count=1
+
+=== BREAKPOINT HIT ===
+pc (/64): 0xffffffff8039db42    <-- blk_mq_submit_bio!
+
+=== Register State at Breakpoint ===
+pc             0xffffffff8039db42  <blk_mq_submit_bio>
+ra             0xffffffff803909a4  <__submit_bio+20>
+sp             0xffffffc8002a3760
+a0             0xffffffd880248240  (bio struct pointer)
+a1             0x8
+a2             0xffffffd880484780
+a3             0xfffffffffffffffe
+a4             0x0
+a5             0xffffffd880484780
+
+=== Backtrace ===
+#0  0xffffffff8039db42 in blk_mq_submit_bio ()
+#1  0xffffffff803909a4 in __submit_bio ()
+
+=== Single-Step Trace ===
+Step 0: PC = 0xffffffff8039db42  blk_mq_submit_bio+0   (function entry)
+Step 1: PC = 0xffffffff8039db44  blk_mq_submit_bio+2   (c.addi sp,-112)
+Step 2: PC = 0xffffffff8039db46  blk_mq_submit_bio+4
+Step 3: PC = 0xffffffff8039db48  blk_mq_submit_bio+6
+
+=== Call Chain ===
+userspace: dd if=/dev/iceblk of=/dev/null bs=4096 count=1
+  -> sys_read
+    -> vfs_read
+      -> blkdev_read_iter
+        -> submit_bio_noacct
+          -> __submit_bio
+            -> blk_mq_submit_bio   <-- BREAKPOINT HERE
+              -> (iceblk_rq_handler via blk_mq dispatch)
+                -> iceblk_queue_request
+                  -> MMIO to iceblk hardware

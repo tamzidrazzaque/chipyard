@@ -1,0 +1,215 @@
+================================================================================
+ DEMO OUTPUT: Live JTAG Kernel Debugging of iceblk Driver on AWS F2 FPGA
+ Date: 2026-04-07
+================================================================================
+
+CONFIGURATION:
+  Target Config:    FireSimDirectJTAGRocketConfig
+  Platform Config:  BaseF2Config
+  AGFI:            agfi-06911dae2b6bf0ef7
+  F2 Instance:     i-004583aa06559da95 (192.168.1.203)
+  JTAG Port:       25050 (remote_bitbang)
+  OpenOCD Config:  remote_bitbang, irlen=5, expected-id=0x00000001
+
+================================================================================
+A. ICEBLK IS A LOADABLE KERNEL MODULE
+================================================================================
+
+  # cat /proc/modules | grep iceblk
+  iceblk 16384 1 - Live 0xffffffff01374000 (O)
+
+  .text section: 0xffffffff01374000
+  Source: software/firemarshal/boards/firechip/drivers/iceblk-driver/iceblk.c
+
+================================================================================
+B. DRIVER FUNCTION MAP (from nm iceblk.ko + base 0xffffffff01374000)
+================================================================================
+
+  iceblk_complete_rq       0xffffffff01374040  (blk-mq completion callback)
+  iceblk_setup             0xffffffff0137405a  (disk/queue initialization)
+  iceblk_probe             0xffffffff013742b6  (platform driver probe)
+  iceblk_isr               0xffffffff01374440  (interrupt handler)
+  iceblk_queue_request     0xffffffff01374540  (MMIO write to hardware)
+  iceblk_rq_handler        0xffffffff013746e6  (blk-mq request handler) <-- BREAKPOINT
+
+================================================================================
+C. BREAKPOINT HIT: iceblk_rq_handler
+================================================================================
+
+  OpenOCD telnet:
+  > halt
+  > reg pc
+  pc (/64): 0xffffffff013746e6            <-- EXACT match: iceblk_rq_handler
+
+  GDB with module symbols loaded:
+  > add-symbol-file iceblk.ko 0xffffffff01374000
+  > info registers
+  pc    0xffffffff013746e6  <iceblk_rq_handler>
+  ra    0xffffffff8039d822  <blk_mq_dispatch_rq_list+252>   (caller)
+  sp    0xffffffc8004ebc00
+  a0    0xffffffd881577e00  (blk_mq_hw_ctx *hctx — first argument)
+  a1    0xffffffc8004ebc28  (blk_mq_queue_data *bd — second argument)
+
+  Backtrace:
+  #0  0xffffffff013746e6  in iceblk_rq_handler ()
+  #1  0xffffffff8039d822  in blk_mq_dispatch_rq_list ()
+
+================================================================================
+D. SINGLE-STEP TRACE THROUGH DRIVER CODE
+================================================================================
+
+  Disassembly of iceblk_rq_handler (from objdump):
+    6e6: addi   sp,sp,-64          ; prologue: allocate stack frame
+    6e8: sd     ra,56(sp)          ; save return address
+    6ea: sd     s0,48(sp)          ; save callee-saved regs
+    6ec: sd     s2,32(sp)
+    6ee: sd     s4,16(sp)
+    6f0: sd     s5,8(sp)
+    6f2: sd     s1,40(sp)
+    6f4: sd     s3,24(sp)
+    6f6: addi   s0,sp,64           ; set frame pointer
+    6f8: ld     s1,0(a1)           ; s1 = bd->rq (load request pointer)
+    6fa: mv     s5,a0              ; s5 = hctx
+    6fc: ld     a5,0(s1)           ; a5 = req->q
+    6fe: mv     a0,s1              ; a0 = req (for blk_mq_start_request)
+    700: ld     a5,232(a5)         ; a5 = req->q->disk
+    702: ld     s3,112(a5)         ; s3 = disk->private_data = iceblk_port
+    706: auipc  ra,0x0             ; call blk_mq_start_request(req)
+    70a: jalr   ra
+
+  Stepped addresses (OpenOCD single-step):
+    0xffffffff013746e6  iceblk_rq_handler+0x00  addi sp,sp,-64
+    0xffffffff013746e8  iceblk_rq_handler+0x02  sd ra,56(sp)
+    0xffffffff013746ea  iceblk_rq_handler+0x04  sd s0,48(sp)
+    0xffffffff013746ec  iceblk_rq_handler+0x06  sd s2,32(sp)
+    0xffffffff013746ee  iceblk_rq_handler+0x08  sd s4,16(sp)
+    0xffffffff013746f0  iceblk_rq_handler+0x0a  sd s5,8(sp)
+    0xffffffff013746f2  iceblk_rq_handler+0x0c  sd s1,40(sp)
+    0xffffffff013746f4  iceblk_rq_handler+0x0e  sd s3,24(sp)
+    0xffffffff013746f6  iceblk_rq_handler+0x10  addi s0,sp,64
+    0xffffffff013746f8  iceblk_rq_handler+0x12  ld s1,0(a1)       <-- loads bd->rq
+    0xffffffff013746fa  iceblk_rq_handler+0x14  mv s5,a0          <-- saves hctx
+    0xffffffff013746fc  iceblk_rq_handler+0x16  ld a5,0(s1)       <-- req->q
+    0xffffffff013746fe  iceblk_rq_handler+0x18  mv a0,s1          <-- a0=req
+    0xffffffff01374700  iceblk_rq_handler+0x1a  ld a5,232(a5)     <-- req->q->disk
+    0xffffffff01374702  iceblk_rq_handler+0x1c  ld s3,112(a5)     <-- disk->private_data
+    0xffffffff01374706  iceblk_rq_handler+0x20  auipc ra (call)
+    0xffffffff0137470a  iceblk_rq_handler+0x24  jalr ra
+    0xffffffff803987c2  blk_mq_start_request+0x00  <-- ENTERED KERNEL FUNCTION
+
+  Continued stepping inside blk_mq_start_request:
+    0xffffffff803987c4  blk_mq_start_request+0x02
+    0xffffffff803987c6  blk_mq_start_request+0x04
+    0xffffffff803987c8  blk_mq_start_request+0x06
+
+================================================================================
+E. CALL PATH: dd → iceblk driver → hardware MMIO
+================================================================================
+
+  Userspace:   dd if=/dev/iceblk of=/dev/null bs=4096 count=1
+       |
+       v
+  VFS:         vfs_read() → generic_file_read_iter()
+       |
+       v
+  Block layer: blk_mq_submit_bio()
+       |
+       v
+  Dispatch:    blk_mq_dispatch_rq_list()
+       |
+       v
+  Driver:      iceblk_rq_handler(hctx, bd)     ← BREAKPOINT HERE
+       |         - loads bd->rq
+       |         - extracts iceblk_port from disk->private_data
+       |         - calls blk_mq_start_request(req)  ← STEPPED INTO
+       |
+       v
+  Driver:      iceblk_queue_request(req, 0)     (for reads)
+       |         - iowrite64(addr, port->iomem + ICEBLK_ADDR)
+       |         - iowrite32(offset, port->iomem + ICEBLK_OFFSET)
+       |         - iowrite32(len, port->iomem + ICEBLK_LEN)
+       |         - iowrite8(0, port->iomem + ICEBLK_WRITE)
+       |         - tag = ioread8(port->iomem + ICEBLK_REQUEST)
+       |
+       v
+  Hardware:    FireSim iceblk MMIO → BlockDevice model → completion IRQ
+       |
+       v
+  Driver:      iceblk_isr() → iceblk_process_completions()
+                 → blk_mq_complete_request() → iceblk_complete_rq()
+
+================================================================================
+F. SOURCE CODE CORRELATION  (iceblk.c lines 134-170)
+================================================================================
+
+  static blk_status_t iceblk_rq_handler(struct blk_mq_hw_ctx *hctx,
+                                         const struct blk_mq_queue_data *bd)
+  {
+      struct request *req = bd->rq;                    // offset +0x12: ld s1,0(a1)
+      struct iceblk_port *port = iceblk_req_port(req); // offsets +0x16..+0x1c
+      blk_status_t err = BLK_STS_OK;
+      unsigned long flags;
+
+      blk_mq_start_request(req);                       // offset +0x20: call
+      spin_lock_irqsave(&port->lock, flags);
+      ...
+      switch (req_op(req)) {
+      case REQ_OP_READ:
+          iceblk_queue_request(req, 0);                 // MMIO to hardware
+          break;
+      ...
+      }
+      spin_unlock_irqrestore(&port->lock, flags);
+      return err;
+  }
+
+================================================================================
+G. DEMO SCRIPT (1-minute live version)
+================================================================================
+
+  # Already running: F2 sim in tmux, Linux booted, SSH tunnel on 25050, OpenOCD up
+
+  # 1. Set breakpoint on iceblk driver (via OpenOCD telnet)
+  echo "rbp all" | nc -q 2 localhost 4444
+  echo "bp 0xffffffff013746e6 2 hw" | nc -q 2 localhost 4444
+  echo "resume" | nc -q 2 localhost 4444
+
+  # 2. Trigger block I/O from userspace
+  ssh -i ~/firesim.pem ubuntu@192.168.1.203 \
+    'tmux send-keys -t firesim "dd if=/dev/iceblk of=/dev/null bs=4096 count=1" Enter'
+
+  # 3. Wait ~10s, then verify breakpoint hit
+  sleep 10
+  printf "halt\nreg pc\n" | nc -q 5 localhost 4444
+  # -> pc = 0xffffffff013746e6  (iceblk_rq_handler)
+
+  # 4. Single-step through driver code
+  printf "rbp all\nstep\nreg pc\nstep\nreg pc\nstep\nreg pc\n" | nc -q 15 localhost 4444
+  # -> steps through prologue into blk_mq_start_request
+
+  # 5. Resume
+  echo "resume" | nc -q 2 localhost 4444
+
+================================================================================
+H. KEY TECHNICAL POINTS FOR PRESENTATION
+================================================================================
+
+  1. This is the first known demonstration of live JTAG kernel debugging
+     of a custom device driver on a FireSim FPGA simulation.
+
+  2. The direct JTAG path required a clock adaptation: the standard Rocket
+     Chip JTAG TAP uses negedge-clocked registers (for TDO output and
+     instruction latching), which is incompatible with FAME-1 transformation.
+     We converted these to posedge-only logic with combinational TDO output.
+
+  3. The iceblk driver is a real FireSim custom block device driver that
+     communicates with the hardware model via MMIO. The breakpoint hits
+     at the exact entry point where the kernel hands a block I/O request
+     to the driver.
+
+  4. The debug path: OpenOCD → remote_bitbang TCP → JTAGBridge (FPGA MMIO)
+     → JTAG TAP → Debug Module → hart debug registers.
+
+  5. GDB can load module symbols (iceblk.ko) at the runtime load address
+     from /proc/modules, enabling source-level debugging of loadable
+     kernel modules.

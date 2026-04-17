@@ -117,6 +117,22 @@ class WithUARTBridge extends HarnessBinder({
     UARTBridge(uartSyncClock, port.io, th.harnessBinderReset.asBool, port.freqMHz)(th.p)
 })
 
+class WithGPIOBridge extends HarnessBinder({
+  case (th: FireSim, port: GPIOPinsPort, chipId: Int) =>
+    val gpioClock = th.harnessClockInstantiator.requestClockMHz("gpio_clock", 100)
+    GPIOBridge(gpioClock, port.io, th.harnessBinderReset.asBool, port.gpioId)(th.p)
+})
+
+class WithExtIntBridge extends HarnessBinder({
+  case (th: FireSim, port: ExtIntPort, chipId: Int) =>
+    ExtIntBridge(th.harnessBinderClock, port.io, th.harnessBinderReset.asBool)(th.p)
+})
+
+class WithSPIFlashBridge extends HarnessBinder({
+  case (th: FireSim, port: SPIFlashPinsPort, chipId: Int) =>
+    SPIFlashBridge(th.harnessBinderClock, port.io, th.harnessBinderReset.asBool, port.params, port.spiId)(th.p)
+})
+
 class WithBlockDeviceBridge extends HarnessBinder({
   case (th: FireSim, port: BlockDevicePort, chipId: Int) => {
     BlockDevBridge(port.io.clock, port.io.bits, th.harnessBinderReset.asBool)

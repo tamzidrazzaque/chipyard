@@ -275,6 +275,18 @@ class WithSPIFlashIOCells extends OverrideIOBinder({
   }
 })
 
+class WithSPIFlashPunchthrough extends OverrideIOBinder({
+  (system: HasPeripherySPIFlash) => {
+    val ports = system.qspi.zipWithIndex.map { case (s, i) =>
+      val p = system.asInstanceOf[BaseSubsystem].p
+      val port = IO(s.cloneType).suggestName(s"qspi_$i")
+      port <> s
+      SPIFlashPinsPort(() => port, p(PeripherySPIFlashKey)(i), i)
+    }
+    (ports, Nil)
+  }
+})
+
 class WithExtInterruptIOCells extends OverrideIOBinder({
   (system: HasExtInterruptsModuleImp) => {
     if (system.outer.nExtInterrupts > 0) {
