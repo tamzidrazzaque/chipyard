@@ -326,13 +326,39 @@ class FireSimLeanGemminiRocketMMIOOnlyConfig extends Config(
   new WithFireSimConfigTweaks ++
   new chipyard.LeanGemminiRocketConfig)
 
+// The radiance revision pinned by this branch no longer defines
+// chipyard.RadianceClusterSynConfig; per the (still-present) Virgo pattern a
+// *SynConfig is exactly WithRadianceSimParams(false) layered over the sim
+// config (see radiance chipyard/VirgoConfigs.scala), so compose it here.
 class FireSimRadianceClusterSynConfig extends Config(
+  // Keep Radiance's 4 GiB ExtMem: the 16 GiB default from
+  // WithFireSimDesignTweaks overlaps the contingent-spad alias region at
+  // 0x1_8000_0000 (radiance CanHaveContingentSpad) and fails AddressDecoder.
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++
   new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
   new chipyard.config.WithNoTraceIO ++
   new WithDefaultFireSimBridges ++
   new chipyard.config.WithRadBootROM ++
   new WithFireSimConfigTweaks ++
-  new chipyard.RadianceClusterSynConfig)
+  new radiance.subsystem.WithRadianceSimParams(false) ++
+  new chipyard.RadianceClusterConfig)
+
+// Radiance memory-performance traffic generators (TLTrafficGen replacing the
+// Muon core, exercising the real coalescer/L0d/L1/L2 path) against the FASED
+// memory model. Single memory channel (RadianceBaseConfig) -> one FASED
+// instance; pair with an HBM PLATFORM_CONFIG, e.g.
+//   PLATFORM_CONFIG=WithHBMRequestTrace_HBM2FRFCFS16GBDualPC_BaseF2Config
+class FireSimRadianceMemPerfConfig extends Config(
+  // See FireSimRadianceClusterSynConfig: 4 GiB ExtMem avoids overlapping the
+  // radiance contingent-spad alias region at 0x1_8000_0000.
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++
+  new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
+  new chipyard.config.WithNoTraceIO ++
+  new WithDefaultFireSimBridges ++
+  new chipyard.config.WithRadBootROM ++
+  new WithFireSimConfigTweaks ++
+  new radiance.subsystem.WithRadianceSimParams(false) ++
+  new chipyard.RadianceMemPerfConfig)
 
 class FireSimLargeBoomCospikeConfig extends Config(
   new WithCospikeBridge ++
