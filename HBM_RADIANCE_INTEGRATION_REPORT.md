@@ -252,3 +252,45 @@ scripts/hbm-validation/run_hbm_validation.sh <outdir>
 Notes: the driver ends at `+max-cycles` with a "timed out" message by design
 (the MemPerf tile's full pattern list exceeds practical metasim budgets); the
 TSI bridge idles harmlessly with binary `none` since the SoC has no host CPU.
+
+## 12. Multi-channel HBM (4 independent channels)
+
+`sims/firesim` bumped to `28bbda543` (`tamzidrazzaque/firesim:hbm-modeling`),
+which adds parameterized multi-channel support to the HBM timing model: one
+`HBMModel` instance now elaborates `maxChannels` (default 1, this run 4)
+`HBMChannelScheduler` instances, each owning its complete scheduler and
+timing state (reference window, FR-FCFS row/column scheduling, PC / bank
+group / bank trackers, refresh, command buses, completion pipes). Channels
+share only the AXI4 front-end transaction queue and the response arbiters.
+The channel select is runtime-programmable (`+mm_chAddr_offset/mask`), and
+single-channel configurations are bit-identical to the previous model (all
+six regression traces byte-identical; chAddr registers only exist when
+maxChannels > 1).
+
+End-to-end Radiance run: `FireSimRadianceMemPerfConfig` (unchanged target
+RTL) against `PLATFORM_CONFIG=WithHBMRequestTrace_WithHBMQuadChannel_HBM2FRFCFS16GBDualPC_BaseF2Config`,
+12 M base cycles, runtime config `hbm2-FRFCFS-2400-OP-REFab-4ch-radiance.conf`
+(base HBM2-2400 OP/REFab plus `chAddr_offset=18, chAddr_mask=3`, i.e. a
+temporary contiguous 256 KiB-per-channel partition sized so the MemPerf 1 MiB
+footprint at `0x1_0100_0000` exercises all four channels; the production-shape
+partition for the full 4 GiB space is `chAddr_offset=30`).
+
+Results (vs. the single-channel run of section 6):
+
+| Metric | 1 channel | 4 channels |
+|---|---|---|
+| requests accepted | 613,255 (R 396,263 / W 216,992) | 633,652 (R 405,396 / W 228,256) |
+| HBM commands issued | 1,396,609 | 1,376,258 (ACT/PRE 350,807, RD 405,396, WR 228,256, REFab 40,992) |
+| per-channel requests | n/a | ch0 182,502 / ch1 165,596 / ch2 142,816 / ch3 142,738 |
+| request-to-channel routing mismatches | n/a | 0 of 633,652 |
+| Ramulator violations | 0 | 0 (per-channel devices: 391,166 / 359,208 / 312,298 / 313,586 commands) |
+| cycles with commands in >1 channel | n/a | 76,569 (all four channels simultaneously: 27,633) |
+| cycles with RD/WR CAS in >1 channel | n/a | 3,173 |
+
+Cross-channel independence was separately proven with a directed fuzzer
+workload confined to (PC0, BG0, bank0): per-channel ACT-to-ACT spacing never
+dropped below tRC (58 >= 57 CK), while ACTs in different channels issued as
+close as the same cycle, all four channels concurrently held their
+channel-local bank0 row0 open, and the same 1000-transaction stream completed
+in 11,158 cycles on 4 channels vs. 30,964 on 1 (2.78x). Full methodology and
+tooling live in `sims/firesim/sim/scripts/hbm-validation/`.
