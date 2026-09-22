@@ -360,6 +360,22 @@ class FireSimRadianceMemPerfConfig extends Config(
   new radiance.subsystem.WithRadianceSimParams(false) ++
   new chipyard.RadianceMemPerfConfig)
 
+// Architecture 1: 4 L2 slices and 4 AXI memory ports, striped together at
+// 512 B (addr[10:9]). Pair with a ONE-channel HBM platform config. WithFASEDBridge
+// instantiates one FASEDMemoryTimingModel per AXI4MemPort, so this is four
+// independently timed channels of one logical HBM (same memoryRegionName),
+// not the aggregate single-AXI HBMModel.
+//   PLATFORM_CONFIG=WithHBMRequestTrace_HBM2FRFCFS16GBDualPC_BaseF2Config
+class FireSimRadianceMemPerf4PathConfig extends Config(
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++
+  new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
+  new chipyard.config.WithNoTraceIO ++
+  new WithDefaultFireSimBridges ++
+  new chipyard.config.WithRadBootROM ++
+  new WithFireSimConfigTweaks ++
+  new radiance.subsystem.WithRadianceSimParams(false) ++
+  new chipyard.RadianceMemPerf4PathConfig)
+
 class FireSimLargeBoomCospikeConfig extends Config(
   new WithCospikeBridge ++
   new WithDefaultFireSimBridges ++
