@@ -48,7 +48,7 @@
 	url = https://github.com/ucb-bar/rocc-acc-utils.git
 [submodule "generators/rocket-chip"]
 	path = generators/rocket-chip
-	url = https://github.com/chipsalliance/rocket-chip.git
+	url = https://github.com/tamzidrazzaque/rocket-chip.git
 [submodule "generators/rocket-chip-blocks"]
 	path = generators/rocket-chip-blocks
 	url = https://github.com/chipsalliance/rocket-chip-blocks.git
@@ -162,4 +162,4 @@
 	url = https://github.com/riscv-tacit/tacit.git
 [submodule "generators/radiance"]
 	path = generators/radiance
-	url = https://github.com/ucb-bar/radiance.git
+	url = https://github.com/tamzidrazzaque/radiance.git
