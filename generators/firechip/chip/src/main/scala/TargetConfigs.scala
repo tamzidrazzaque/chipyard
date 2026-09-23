@@ -376,6 +376,17 @@ class FireSimRadianceMemPerf4PathConfig extends Config(
   new radiance.subsystem.WithRadianceSimParams(false) ++
   new chipyard.RadianceMemPerf4PathConfig)
 
+// Test-only 32 B stripe (addr[6:5]). Not Architecture 1.
+class FireSimRadianceMemPerf4Path32BConfig extends Config(
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++
+  new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
+  new chipyard.config.WithNoTraceIO ++
+  new WithDefaultFireSimBridges ++
+  new chipyard.config.WithRadBootROM ++
+  new WithFireSimConfigTweaks ++
+  new radiance.subsystem.WithRadianceSimParams(false) ++
+  new chipyard.RadianceMemPerf4Path32BConfig)
+
 class FireSimLargeBoomCospikeConfig extends Config(
   new WithCospikeBridge ++
   new WithDefaultFireSimBridges ++
