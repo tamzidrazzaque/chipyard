@@ -12,8 +12,13 @@ Rocket Chip commits are pinned as submodules.
 | Rocket Chip | `tamzidrazzaque/rocket-chip` `hbm-512b-stripe` | `e2cbfb4` |
 
 ```bash
-git clone --recursive -b hbm-arch1-512b \
+git clone -b hbm-arch1-512b \
   https://github.com/tamzidrazzaque/chipyard.git
+cd chipyard
+# Pull only the Architecture 1 pins (avoid `git clone --recursive`: it spends
+# hours inside generators/ara nested qemu/llvm/gcc toolchains unrelated to HBM).
+git submodule update --init \
+  generators/radiance generators/rocket-chip sims/firesim
 ```
 
 ## What this branch is
