@@ -448,3 +448,15 @@ Only 26 HBM writes. The checker still saw the right C, so the result moved throu
 Kernel memory window ≈ cycles 17799..125081 (107k cycles, 214 µs at 500 MHz). About 32 KB moved. Achieved bandwidth ≈ 0.14 GB/s, under 1% of the 16 GB/s AXI peak. 524288 FLOPs in that window is about 2.4 GFLOP/s. The limit is the 64³ working set and the core, not the HBM pins.
 
 Hardware in this image: 1 cluster, 2 Muon cores, 8 warp slots and 256 physical registers per core, 4 L2 slices, 4 AXI ports, 4 one-channel FASED models, 2 pseudo-channels each. SM:L2:controller:channel = 2:4:4:4. Each L2 slice feeds one 8-byte port. That is not a 32-byte HBM channel interface. Not changed in this run.
+
+## 14. Mapping experiment on the same 64³ ELF (2026-10-04)
+
+Timing-only plusargs, same `kernel_w4.soc.elf` as section 13, same 500 MHz binder clock, same HBM timings. Functional AXI addresses are unchanged. Bank/BG/PC/row programmed as the compacted channel-local fields: bank `addr[15:12]`, PC `addr[16]`, row `addr[35:17]`. That is what remains after `addr[10:9]` is removed and the higher bits shift down by 2.
+
+Log `hbm-arch1-out/e2e-gemm/logs/gemm64-a1.log`.
+
+`check: wrong=0/2048` PASS. Ramulator 0 violations on 3041 commands.
+
+Kernel HBM window 17711..125159 (span 107448 cycles) versus baseline 17711..125081 (span 107370). Bytes 29536 versus 29568. No runtime change.
+
+Every path saw bank groups {0,1,2,3}. The 24 KB working set does not exercise every bank; a 128³ address trace re-decoded with these fields hits all 16 banks and both PCs on every path, but that 128³ run itself asserted in L0d before a correctness check (`D-channel traffic other than a flush ReleaseAck while the flush unit is busy`), including with `GEMM_BOUND_MLP_STRICT`. The 64³ result is unchanged because this GEMM never fills the 8-byte ports. The mapping fix is not a performance improvement on this workload.
