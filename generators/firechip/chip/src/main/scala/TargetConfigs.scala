@@ -376,6 +376,54 @@ class FireSimRadianceMemPerf4PathConfig extends Config(
   new radiance.subsystem.WithRadianceSimParams(false) ++
   new chipyard.RadianceMemPerf4PathConfig)
 
+// Real Radiance kernel (Rocket host + 2 Muon cores + MX-Gemmini) on the same
+// Architecture 1 memory organization as FireSimRadianceMemPerf4PathConfig:
+// 4 L2 slices, 4 AXI ports, 512 B stripes, one 1-channel FASED HBM per port.
+// Pair with PLATFORM_CONFIG=WithHBMRequestTrace_HBM2FRFCFS16GBDualPC_BaseF2Config.
+// Does not change address decode or the HBM model.
+class FireSimRadianceTapeout4PathConfig extends Config(
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++
+  new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
+  new chipyard.config.WithNoTraceIO ++
+  new WithDefaultFireSimBridges ++
+  new chipyard.config.WithRadBootROM ++
+  new WithFireSimConfigTweaks ++
+  new radiance.subsystem.WithRadianceSimParams(false) ++
+  new chipyard.RadianceSingleClusterTapeoutSim4PathConfig)
+
+// Same Architecture 1 memory system as FireSimRadianceTapeout4PathConfig
+// (4 L2 slices, 4 AXI ports, 512 B stripes, one 1-channel FASED HBM per port)
+// but without MX-Gemmini. Verilator rejects the tapeout image: Gemmini's
+// controller emits a 262144-bit literal (FireSim-generated.sv, Controller.scala:124).
+// tapeout_template / Muon global-memory kernels do not use the mesh.
+class FireSimRadianceMuon4PathConfig extends Config(
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++
+  new chipyard.harness.WithHarnessBinderClockFreqMHz(500.0) ++
+  new chipyard.config.WithNoTraceIO ++
+  new WithDefaultFireSimBridges ++
+  new chipyard.config.WithRadBootROM ++
+  new WithFireSimConfigTweaks ++
+  new radiance.subsystem.WithRadianceSimParams(false) ++
+  new chipyard.WithAlignedL2MemoryChannels(4, 512) ++
+  new radiance.subsystem.WithMuonCores(
+    2,
+    location = InCluster(0),
+    noILP = false,
+    l0i = Some(chipyard.L0iCacheConfig),
+    l0d = Some(chipyard.L0dCacheConfig)) ++
+  new radiance.subsystem.WithRadianceCluster(
+    0,
+    smemConfig = chipyard.TapeoutSmemConfig,
+    l1Config = chipyard.L1CacheConfig) ++
+  new radiance.subsystem.WithExtGPUMem() ++
+  new chipyard.WithRadianceRocket ++
+  // Hold the GPU in reset until the Rocket writes 0 to 0x41000000.
+  // defaultReset=false lets both Muons execute crt0 at cycle 0; they stall
+  // inside vx_tmc and a later soft-reset release does not dispatch again.
+  // This matches RadianceSingleClusterHostLaunchConfig.
+  new radiance.subsystem.WithGPUResetAggregator(defaultReset = true) ++
+  new chipyard.RadianceBaseConfig)
+
 class FireSimLargeBoomCospikeConfig extends Config(
   new WithCospikeBridge ++
   new WithDefaultFireSimBridges ++

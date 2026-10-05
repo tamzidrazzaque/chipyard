@@ -294,3 +294,157 @@ close as the same cycle, all four channels concurrently held their
 channel-local bank0 row0 open, and the same 1000-transaction stream completed
 in 11,158 cycles on 4 channels vs. 30,964 on 1 (2.78x). Full methodology and
 tooling live in `sims/firesim/sim/scripts/hbm-validation/`.
+
+## 12. Real kernel on FireSimRadianceMuon4PathConfig (2026-09-29)
+
+Andre: keep the current HBM controller. PARE is on the NVIDIA side, targeting mid-October, and is not a blocker. No PARE work in this section.
+
+Stage checklist for `kernels/tapeout_template/kernel.soc.elf`:
+
+| Stage | Status |
+|---|---|
+| BUILD | yes, Muon 4-path image |
+| ELF LOAD | yes, LoadMem, no HBM-timed ELF writes |
+| BOOT | yes, Rocket retires `_start` at `0x80000000` |
+| KERNEL LAUNCH | partial: GPU reaches `main`, stalls in `rad_tapeout_begin` |
+| FUNCTIONAL PASS | no |
+| HBM TRACE of a finished kernel | no |
+| RAMULATOR on a finished kernel | not run |
+
+### 12.1 Image
+
+`FireSimRadianceTapeout4PathConfig` elaborates, then Verilator 5.022 rejects a 262144-bit literal from `gemmini/Controller.scala:124` (`262143'd0`). VCS is not installed. That config is not the experiment image.
+
+`FireSimRadianceMuon4PathConfig` is the same 4 L2 / 4 AXI / 512 B / 4 FASED / 4 one-channel HBM organization without the mesh. Verilator needs `-I` on cvfpu `registers.svh`, fpnew packages moved above their imports (`scripts/hbm-validation/reorder_fpnew_packages.py`), and `-Wno-BLKANDNBLK -Wno-fatal`.
+
+SHAs: Chipyard `c5ad0ad669d2`, Radiance `1356a02dd`, FireSim `1b49ab0e7`, Rocket Chip `e2cbfb426`, radiance-kernels `aed22f7`.
+
+### 12.2 Why the Rocket sat at PC 0
+
+`WithRadBootROM` loads `bootrom.radiance.rv32.img` and sets the reset vector to `0x10100` (`_hang100`). The generated image, and the commit log of this config, do the following.
+
+1. `0x10100` `lui a1, 0x2000` — CLINT base `0x2000000`.
+2. `0x10104` was `csrr a0, 0xcc5`. Rocket does not implement CSR `0xcc5`. The illegal-instruction trap uses the default `mtvec` of 0, so the next committed PC is 0. This is the first failure. Hart 0 never reached the MSIP poll.
+3. After that CSR is `csrr a0, mhartid` (hart 0 on this trace, `C0`), the poll is `lw t0, 0(a1)` / `bnez` / `j wfi_loop` at `0x10110`. FESVR does release it: `tsi_t::reset` writes `uint32_t 1` to `MSIP_BASE` `0x2000000` (`fesvr/tsi.cc`), called from `firesim_tsi_t::reset` after LoadMem, and only if `write_hart0_msip` (default true). The GPU is not the waker. There is no second hart that is supposed to set hart 0's MSIP.
+4. The original `loop_exit` then jumps to `wake_other_cores`. That loop stores 1 to successive MSIP words and branches while the load reads back nonzero. On this CLINT the readback stays 1, the pointer walks off the hart map, and the core traps to `mtvec` 0. Commit log of the mhartid-only image: `0x10080` (`interrupt_loop`) three times, then PC 0.
+5. `start_exec` used `li t0, 0x80000000`, which this RV32 image encodes as `lui`. On the RV64 Rocket that sign-extends to `0xffffffff80000000`. The commit log of that image records the jump target as `ffffffff80000000` and the next PC as 0. `kernel.soc.elf` entry is the zero-extended address `0x80000000` (`auipc sp, 0x80`).
+
+The bootrom is the same resource every `WithRadBootROM` config uses, including the tapeout sim configs. Nothing in the 4-path HBM wiring removes the CLINT (`clint@2000000` is in the DTS) or the FESVR MSIP write. The HBM path is not the boot bug.
+
+Fix in `generators/testchipip/src/main/resources/testchipip/bootrom/bootrom.radiance.S` (same inode as `generators/testchipip/bootrom/bootrom.radiance.S`):
+
+- `csrr a0, mhartid`
+- `loop_exit` is `j start_exec` (do not run `interrupt_loop`)
+- `addi t0, x0, 1; slli t0, t0, 31; jr t0` so the DRAM address is `0x0000000080000000` on RV64 and `0x80000000` on RV32
+
+`start_exec` clears MSIP with `sw zero` and jumps. The host ELF then calls `rad_host_run`, which is what releases the GPU.
+
+The run below used a generated-ROM image with those three instruction changes (mhartid, skip `wake_other_cores`, zero-extended jump). A clean Chisel rebuild reads `bootrom.radiance.rv32.img`, which was reassembled from the same source.
+
+### 12.3 Boot proof
+
+`+rocket_commit_log=1` (default off; see below), cycle 3045:
+
+`C0 pc=[0000000080000000] inst=[00080117]` which is `_start`'s `auipc sp, 0x80`.
+
+The simulator then prints `Hello from Rocket: tapeout template, vecadd of 4096 words`. That string is the first line of `host.cpp` `main`.
+
+### 12.4 ELF and the three early reads
+
+`readelf -h`: entry `0x80000000`. Load segments: host text `0x80000000` (0x13c8 bytes, R-X), host data/htif/bss `0x80002000`, fused GPU image at `0x110000000` (`.rv32.seg0` through `.rv32.seg4`). `main` is `0x80000924`. GPU `kernel.radiance.elf` entry is `0x10000000`; `soc/fuse_rv32_into_rv64.sh` adds `0x100000000`.
+
+`mu_start.S` `_start` (device `0x10000000`): `la`/`lw.global` of `__mu_num_warps`, `vx_wspawn`, `vx_tmc -1`, `jal init_regs`, `jal main`. `main` calls `rad_tapeout_begin` then `mu_schedule(vecadd_entry, TT_ARGS_ADDR, 3)`.
+
+First HBM requests on the booting run (all reads; no HBM-timed writes of the ELF):
+
+| cycle | id | addr | what |
+|---|---|---|---|
+| 524 | 1 | `0x110000000` | GPU I$ of `_start`. `[DISPATCH] pc=10000000` is already in the log. Rocket is still in the MSIP loop. |
+| 603 | 1 | `0x110000020` | next `.init` line, through `vx_tmc` at `0x10000038`. No later fill of `0x110000040` (`jal init_regs`). |
+| 2969 | 1 | `0x80000000` | Rocket I$ of `_start`, only after the boot fix. Commit of that instruction is cycle 3045. |
+| 3056 | 1 | `0x80000920` | Rocket I$ of the `main` / `write_inputs` line. |
+| 3058 | 3 | `0x800020a0` | 32 B line that contains `.htif` / `tohost` at `0x800020a8`. Same cycle and address as the pre-fix runs, and AXI id 3 rather than the Rocket I$ id 1, so this is not `main`. |
+
+`0x800020a0` sits in `.data` (`0x80002000`, size `0xa8`). `.data` ends at `0x800020a8`, which is `tohost`.
+
+### 12.5 Kernel reaches `main` and stalls in `rad_tapeout_begin`
+
+With `defaultReset = false` the GPU fetched crt0 at cycle 0, dispatched only through `vx_tmc` at `0x10000038`, and never dispatched again after the host released reset. The Rocket still wrote A/B/C and then spun at `0x800005b4` (the postbox poll inside `rad_host_run`, after `sw zero` to `0x41000000`). Timeout 1400000 cycles. Log: `hbm-arch1-out/tapeout-vecadd-pcreg.log`. No `check:`, no PASS.
+
+`RadianceSingleClusterHostLaunchConfig` uses `WithGPUResetAggregator(defaultReset = true)`. The Muon FireSim config now does too, and that image was rebuilt from `bootrom.radiance.rv32.img`. Rerun (`hbm-arch1-out/tapeout-vecadd-reset1.log`, `+gpu_finish_keeps_sim=1`, no commit log):
+
+- Hello still prints.
+- No `[DISPATCH]` until the host finishes `write_inputs` and releases reset.
+- Then both cores run `_start`, `init_regs` (`0x10003f08`), and `main` (`0x10002000` through `0x10002068`).
+- HBM reads of the stack under `0x17F000000` (`STACK_BASE_ADDR` `0x7F000000` with the `0x100000000` GPU DRAM base) and of GPU text `0x110002060`.
+- Last dispatched instruction is `0x10002068` (`sltiu`). The next instruction, `vx_split_n` at `0x10002070`, is never dispatched. That split is the compiler's expansion of the `for (w = cid; w < 8; w += MU_NUM_CORES)` loop in `rad_tapeout_begin` (`lib/include/rad_tapeout.h`). After that, HBM requests stop (last cycle 1026700) while the target clock keeps refreshing (past 1.6M). The host is in the postbox poll. `vecadd_entry` does not run.
+
+So boot and host-side input setup work. The remaining blocker is the GPU stall on `vx_split_n` inside `rad_tapeout_begin`, before any global vecadd load or store.
+
+### 12.6 Partial HBM numbers (not a finished kernel)
+
+Log `hbm-arch1-out/tapeout-vecadd-pcreg.log`. 2127 requests, 1867 reads, 260 writes, cycles 524..1025351. Paths 548 / 521 / 534 / 524. Banks and bank groups match the known `addr[10:9]` overlap: paths 0 and 1 see even banks and BGs {0, 2}; paths 2 and 3 see odd banks and BGs {1, 3}. These 16 KB buffers are 16 KB-aligned, so `addr[14]` (PC) stays 0 on almost every request; path 3 is the one that also sees PC 1. Commands, summed across channels: ACT 1882, PRE 1882, RD 1867, WR 260, REF 2384, REFSB 0. Ramulator was not run on this partial trace.
+
+### 12.7 Commit log
+
+`RocketCore` printed every retired instruction from the `else` of `enableCommitLog`, which is false by default, so the printf was unconditional. It is now gated by `+rocket_commit_log=1` (`PlusArg` default 0). HBMREQ and `CommandBusMonitor` prints are unchanged.
+
+### 12.8 gemm_simt
+
+Superseded by section 13. Upstream `host.cpp` still returns immediately. The passing run used a host checker in a separate worktree and did not use `gemm_mxgemmini`.
+
+## 13. GEMM through the 4-path HBM model (2026-10-04)
+
+Stayed on the existing pins. Did not merge `origin/main`. `origin/split-l2` (`9330797`) is still an ancestor of Radiance `1356a02dd`. Muon LLVM is still `muon-2026-09-24` / `d2f676d` / clang 18.1.7, checksum unchanged.
+
+Cyclotron is not installed. `MuonCoreTestConfig` is a 1-core Cyclotron DPI cosim, and the Radiance README runs it under `sims/vcs`. VCS is not installed, and the GEMM ELF is compiled with `MU_NUM_CORES=2`. That earlier stage was not run. The functional result below is the FireSim SoC run.
+
+### 13.1 Workload
+
+`kernels/gemm_simt/kernel_impl.hpp` `gemm()`, bf16, M=N=K=64, global A/B/C, shared-memory tiles. Build flags on top of `common.mk`: `-DBM=8 -DBN=32 -DILP_MEM=1 -DGEMM_BOUND_MLP`. That is 4 resident warps, one global fence between the A and B loads, and the same `gemm()` over the full 64×64×64. FLOPs = 2·64³ = 524288.
+
+The default 8-warp ILP-2 compile is not what passed:
+
+- without the fence, core 1 hits `TLNBDCache.scala:201` `response must be ready!` (the comment in `kernel_impl.hpp` describes this L0d bug; `GEMM_BOUND_MLP` is the in-tree workaround)
+- with 8 warps, `Rename.scala` hits `total register usage exceeded maximum number of physical registers` (`numPhysRegs = 256`)
+
+A = I + E₀₁, B = I + E₁₀, so C = AB has C₀₀ = 2.0 (`0x4000`), C₀₁ = 1.0, C₁₀ = 1.0, and the other diagonal entries 1.0. That is not a copy of A or of B.
+
+Device ELF `kernel_w4.radiance.elf` sha256 `a67a9dc9cc3d86aba574295a2371bf3a37697888a87d078014fc8d1d03f7607f`. The `.init` bytes of that file are inside `kernel_w4.soc.elf` sha256 `6ea5143fb710bb349ea5760b2418b06697fbef71b72a5f2d7c5ca910d1688969`. No `rad_tapeout_begin`.
+
+### 13.2 FireSim result
+
+`FireSimRadianceMuon4PathConfig`, same 4-path HBM runtime config, `+gpu_finish_keeps_sim=1`. Log `hbm-arch1-out/e2e-gemm/logs/gemm-firesim-ab.log`.
+
+```
+Hello from Rocket: gemm_simt 64x64x64 bf16 AB
+check: wrong=0/2048 first=0 got=0x3f804000
+PASS
+```
+
+`0x3f804000` is the packed pair (C₀₀=2.0, C₀₁=1.0). All 2048 packed words matched. GPU dispatch ran `main` and returned through `_exit`. Global A/B/C traffic is in the HBM request log (256 A reads, 256 B reads, 260 C requests).
+
+### 13.3 HBM and Ramulator
+
+1004 requests, 978 reads, 26 writes, 32128 bytes (8-byte AXI beats). Cycles 3214..882508. Matrix traffic itself ends by cycle 125081 (last stack write); the host then waits 400000 cycles before the checker, which is why the last request is host text.
+
+| path | reqs | R | W | PCs | BGs | banks | rows |
+|---|---:|---:|---:|---|---|---|---:|
+| 0 | 238 | 238 | 0 | 0,1 | 0,2 | even 0..14 | 3 |
+| 1 | 232 | 232 | 0 | 0,1 | 0,2 | even 0..14 | 3 |
+| 2 | 234 | 233 | 1 | 0,1 | 1,3 | odd 1..15 | 5 |
+| 3 | 300 | 275 | 25 | 0,1 | 1,3 | odd 1..15 | 12 |
+
+Same `addr[10:9]` overlap as before: each path sees 2 of 4 bank groups and 8 of 16 banks. Both pseudo-channels appear. Commands: ACT 195, PRE 195, RD 978, WR 26, REF 2088, REFSB 0. Most refreshes are the host wait, not the GEMM.
+
+Ramulator `HBM2_2400Mbps` / `HBM2_8Gb`: **0 violations** on 3482 commands. Trace `hbm-arch1-out/e2e-gemm/traces/gemm-ab-cmds.csv`.
+
+Only 26 HBM writes. The checker still saw the right C, so the result moved through the on-chip caches. This 8 KB result does not stream through DRAM.
+
+### 13.4 Bandwidth, at the 500 MHz binder clock
+
+`WithHarnessBinderClockFreqMHz(500)` on this FireSim config. AXI data width is `writeBytes = 8` on the inclusive cache (`RadianceBaseConfig`), 4 ports. Peak if every port transfers every target cycle: 4 · 8 B · 500 MHz = 16 GB/s.
+
+Kernel memory window ≈ cycles 17799..125081 (107k cycles, 214 µs at 500 MHz). About 32 KB moved. Achieved bandwidth ≈ 0.14 GB/s, under 1% of the 16 GB/s AXI peak. 524288 FLOPs in that window is about 2.4 GFLOP/s. The limit is the 64³ working set and the core, not the HBM pins.
+
+Hardware in this image: 1 cluster, 2 Muon cores, 8 warp slots and 256 physical registers per core, 4 L2 slices, 4 AXI ports, 4 one-channel FASED models, 2 pseudo-channels each. SM:L2:controller:channel = 2:4:4:4. Each L2 slice feeds one 8-byte port. That is not a 32-byte HBM channel interface. Not changed in this run.
