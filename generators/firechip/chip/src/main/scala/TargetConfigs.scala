@@ -410,7 +410,6 @@ class FireSimE4M3MxGemminiFourClusterRadianceConfig extends Config(
   new chipyard.RadianceE4M3MxGemminiFourClusterConfig)
 
 class FireSimE4M3MxGemminiHBMRadianceConfig extends Config(
-  new WithGPUDefaultResetHeld ++
   new radiance.subsystem.WithRadianceSimParams(false) ++
   new chipyard.config.WithNoTraceIO ++
   new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++ // 4 GiB
