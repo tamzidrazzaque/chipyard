@@ -28,9 +28,14 @@ tree now pins Radiance `bd6c4b7af8fc90b939061862baa35c2f200899cd`, Gemmini
 XB10 and timed-HBM lines, strict five-bridge runtime configuration, content-
 addressed artifact/profile checks, shared-host card isolation, and host-build
 tests. The Gemmini commit removes the oversized shift width that invalidated
-the earlier generated RTL. Final Golden Gate, Verilator, and physical-build
-artifacts must be regenerated from these current gitlinks before they count as
-evidence.
+the earlier generated RTL. Fresh isolated Golden Gate and Verilator artifacts
+have now been regenerated from these gitlinks and passed the host-only audits
+in `exact-goldengate-verilator-provenance.md` and `metasim-flow-audit.md`.
+No Vivado build, bitstream, driver bundle, or physical-FPGA result exists from
+that host validation; those deployment artifacts remain blocked.
+The live checkout also carries an unrelated user modification to Gemmini's
+generated software-test header. It was preserved and excluded from this work,
+so the checkout is intentionally not claimed as clean ready-mode provenance.
 
 ## Configuration facts established from source
 
@@ -61,6 +66,24 @@ evidence.
 - Use native STREAM Copy/Scale/Add/Triad and Spatter 0-4 for the final baseline.
 - Do not import JESD270-4A/HBM4 timing values into the HBM2 model. The document is
   useful for methodology and traffic-pattern design only.
+
+## Fresh host-only validation
+
+Fresh isolated Golden Gate and Verilator builds completed for the controlled
+HBM and DDR platforms. HBM2-2400, HBM2-2000, and DDR3-2133 then passed
+sequential two-SM STREAM Copy correctness smokes with the same pinned hashed
+ELF. The canonical pass cycles were 395266, 392194, and 386050; kernel cycles
+were 13670, 12682, and 11538, respectively. All four cores reported completion,
+all five FASED models accepted their complete explicit profiles with hardware
+defaults disabled, and every run produced five valid terminal statistics
+files.
+
+These values prove target/profile realization and the correctness path only.
+The workload is intentionally tiny, and host Verilator wall time is not XB10
+performance. Exact source identities, build/output hashes, per-core UART
+evidence, and CSV hashes are recorded in
+`exact-goldengate-verilator-provenance.md`, `metasim-flow-audit.md`, and
+`host-only-validation.sha256`.
 
 The host-only XB10 deployment schema, exact hashed-ELF LoadMem path, fail-closed
 single-slot templates, and nine-case campaign contract are recorded in

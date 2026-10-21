@@ -4,8 +4,10 @@ Audit date: 2026-10-21 PDT
 
 Status: the manager schemas, exact workload resolution, address-hash loading
 path, single-slot topology, campaign rules, and canonical FASED profiles parse
-and validate. The files are deliberately fail-closed templates. No SSH
-connection, FPGA device, Vivado process, driver, or programming action was
+and validate. Fresh Golden Gate/Verilator artifacts and three strict host
+correctness smokes are recorded separately, but they are not physical
+deployment artifacts. The files remain deliberately fail-closed templates. No
+SSH connection, FPGA device, Vivado process, driver, or programming action was
 opened by this audit.
 
 ## Files
@@ -276,11 +278,17 @@ require the build/packaging flow to embed or sign a build-produced attestation.
 
 ## Remaining blockers and destructive boundary
 
-- The final clean parent build commit and its FireSim/Radiance/Spike gitlinks
-  are not yet recorded in a deployment campaign copy.
-- Post-fix Golden Gate hashes must replace the explicit placeholders only after
-  HBM and DDR are regenerated; the earlier pre-fix hashes are not accepted as
-  deployment provenance.
+- Host generation records parent build commit
+  `b0bb67a7cf4454b825e131277386bdcbf3cac403` and its nested source identities,
+  but no deployment-ready campaign copy has been filled. The live checkout
+  also carries an unrelated user change to Gemmini's generated software-test
+  header; it was preserved, and ready-mode cleanliness must continue to reject
+  that checkout rather than staging or reverting the user's file.
+- Fresh post-fix Golden Gate and host-`VFireSim` hashes now exist under the
+  isolated host-build root and are recorded in
+  `exact-goldengate-verilator-provenance.md`. They are not 20 MHz TIMING
+  bitstream/driver archives and therefore do not resolve the checked-in
+  deployment placeholders.
 - Neither 20 MHz TIMING bitstream tar exists yet.
 - Matching driver bundles cannot be finalized until the bitstream metadata
   exists. The canonical and manager-visible five-index profiles already pass.
