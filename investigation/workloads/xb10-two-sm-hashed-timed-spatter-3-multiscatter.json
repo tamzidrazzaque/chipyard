@@ -3,6 +3,14 @@
   "common_bootbinary": "../../../../../../radiance-kernels/kernels/spatter/runs/two-sm-native/hashed/timed/case-3-multiscatter/kernel.soc.elf",
   "common_rootfs": null,
   "common_outputs": [],
-  "common_simulation_outputs": ["uartlog"],
+  "common_simulation_outputs": [
+    "uartlog",
+    "memory_stats0.csv",
+    "memory_stats1.csv",
+    "memory_stats2.csv",
+    "memory_stats3.csv",
+    "memory_stats4.csv",
+    "fased-runtime-profile.applied.json"
+  ],
   "common_simulation_inputs": []
 }

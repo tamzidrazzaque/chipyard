@@ -29,7 +29,8 @@ target_config:
     link_latency: 6405
     switching_latency: 10
     net_bandwidth: 200
-    profile_interval: -1
+    # Sample all five FASED models coarsely; each driver also writes a final row.
+    profile_interval: 10000000
     default_hw_config: xb10_two_sm_hbm2_frfcfs_20mhz_timing_hbm2000_sensitivity
     plusarg_passthrough: ""
 

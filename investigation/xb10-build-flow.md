@@ -4,9 +4,11 @@ Audit date: 2026-10-21 PDT
 
 Status: the build recipes parse and the Vivado 2025.1 device/IP catalog is
 usable. No Vivado build was launched and no FPGA was opened, programmed, or
-otherwise touched. FireSim commit `eb6f799dd` makes the manager key path and
-remote Vivado activation explicit. The manager must not be launched until
-localhost SSH authentication is separately resolved.
+otherwise touched. FireSim commit
+`590ebc4e7e1061a7b96bb333b7c692701a791bac` also makes the manager key path,
+remote Vivado activation, archive contracts, and selected-card safety checks
+explicit. The manager must not be launched until localhost SSH authentication
+is separately resolved.
 
 ## Controlled pair
 

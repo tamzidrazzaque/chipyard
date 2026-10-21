@@ -1,0 +1,74 @@
+{
+  "source_hashes": {
+    "target_annotations": "5d74fe915096616e84162a2616d5d688acbb9f454ffe1ea6a5eb5fd0cae99411",
+    "frequency_summary": "1f67b3afd98ae8dbb2ce19b8970b1d01f180a29337e276a8a6b706235a7b977c"
+  },
+  "input_reference_mhz": 1000.0,
+  "output_clocks": [
+    "uart_clock",
+    "clock_1000.0MHz",
+    "harnessbinder_clock"
+  ],
+  "bridges": [
+    {
+      "target": "~FireSim|FASEDBridge_0",
+      "widgetClass": "midas.models.FASEDMemoryTimingModel",
+      "widgetConstructorKey": {
+        "axi4Widths": {"dataBits": 64, "addrBits": 32, "idBits": 4},
+        "axi4Edge": {
+          "maxReadTransfer": 4,
+          "maxWriteTransfer": 4,
+          "address": [{"base": 2147483648, "mask": 2147483647}]
+        }
+      }
+    },
+    {
+      "target": "~FireSim|FASEDBridge_1",
+      "widgetClass": "midas.models.FASEDMemoryTimingModel",
+      "widgetConstructorKey": {
+        "axi4Widths": {"dataBits": 64, "addrBits": 33, "idBits": 4},
+        "axi4Edge": {
+          "maxReadTransfer": 4,
+          "maxWriteTransfer": 4,
+          "address": [{"base": 4294967296, "mask": 536870911}]
+        }
+      }
+    },
+    {
+      "target": "~FireSim|FASEDBridge_2",
+      "widgetClass": "midas.models.FASEDMemoryTimingModel",
+      "widgetConstructorKey": {
+        "axi4Widths": {"dataBits": 64, "addrBits": 33, "idBits": 4},
+        "axi4Edge": {
+          "maxReadTransfer": 4,
+          "maxWriteTransfer": 4,
+          "address": [{"base": 4831838208, "mask": 536870911}]
+        }
+      }
+    },
+    {
+      "target": "~FireSim|FASEDBridge_3",
+      "widgetClass": "midas.models.FASEDMemoryTimingModel",
+      "widgetConstructorKey": {
+        "axi4Widths": {"dataBits": 64, "addrBits": 33, "idBits": 4},
+        "axi4Edge": {
+          "maxReadTransfer": 4,
+          "maxWriteTransfer": 4,
+          "address": [{"base": 5368709120, "mask": 536870911}]
+        }
+      }
+    },
+    {
+      "target": "~FireSim|FASEDBridge_4",
+      "widgetClass": "midas.models.FASEDMemoryTimingModel",
+      "widgetConstructorKey": {
+        "axi4Widths": {"dataBits": 64, "addrBits": 33, "idBits": 4},
+        "axi4Edge": {
+          "maxReadTransfer": 4,
+          "maxWriteTransfer": 4,
+          "address": [{"base": 5905580032, "mask": 536870911}]
+        }
+      }
+    }
+  ]
+}

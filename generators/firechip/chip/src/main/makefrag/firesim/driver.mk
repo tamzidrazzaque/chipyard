@@ -5,12 +5,23 @@
 # Driver Sources & Flags #
 ##########################
 
-ifeq (,$(wildcard $(RISCV)/lib/libriscv.so))
-$(warning libriscv not found)
-LRISCV=
-else
-LRISCV=-lriscv
+# FESVR is a host-side driver dependency. Allow it to live outside the target
+# cross-toolchain while retaining the historical RISCV-based default.
+FIRESIM_FESVR_PREFIX ?= $(RISCV)
+ifeq (,$(strip $(FIRESIM_FESVR_PREFIX)))
+FIRESIM_FESVR_PREFIX := $(RISCV)
 endif
+
+FIRESIM_FESVR_ARCHIVE := $(FIRESIM_FESVR_PREFIX)/lib/libfesvr.a
+FIRESIM_RISCV_DSO := $(FIRESIM_FESVR_PREFIX)/lib/libriscv.so
+
+ifeq (,$(wildcard $(FIRESIM_FESVR_ARCHIVE)))
+$(error FireSim host FESVR archive not found: $(FIRESIM_FESVR_ARCHIVE))
+endif
+ifeq (,$(wildcard $(FIRESIM_RISCV_DSO)))
+$(error FireSim cospike library not found: $(FIRESIM_RISCV_DSO))
+endif
+LRISCV=-lriscv
 
 firechip_lib_dir = $(chipyard_dir)/generators/firechip/chip/src/main/cc
 firechip_bridgestubs_lib_dir = $(chipyard_dir)/generators/firechip/bridgestubs/src/main/cc
@@ -29,15 +40,15 @@ DRIVER_CC += \
 		$(testchipip_csrc_dir)/testchip_htif.cc \
 		$(firechip_bridgestubs_lib_dir)/fesvr/firesim_tsi.cc \
 		$(firechip_bridgestubs_lib_dir)/fesvr/firesim_dtm.cc \
-		$(RISCV)/lib/libfesvr.a
+		$(FIRESIM_FESVR_ARCHIVE)
 # Disable missing override warning for testchipip.
 TARGET_CXX_FLAGS += \
 		-isystem $(testchipip_csrc_dir) \
-		-isystem $(RISCV)/include \
+		-isystem $(FIRESIM_FESVR_PREFIX)/include \
 		-Wno-inconsistent-missing-override
 TARGET_LD_FLAGS += \
-		-L$(RISCV)/lib \
-		-Wl,-rpath,$(RISCV)/lib \
+		-L$(FIRESIM_FESVR_PREFIX)/lib \
+		-Wl,-rpath,$(FIRESIM_FESVR_PREFIX)/lib \
 		$(LRISCV)
 
 # top-level sources

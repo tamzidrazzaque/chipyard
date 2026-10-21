@@ -444,14 +444,6 @@ class FireSimMxE4M3VpuGemminiRocketConfig extends Config(
   new WithFireSimConfigTweaks ++
   new chipyard.MxE4M3VpuGemminiRocketConfig)
 
-// FP4 only (no E4M3, no QuantLut) with the VPU; 4-bank L2 with 64 DRAM reads in flight:
-// chipyard.MxFp4VpuGemminiRocketConfig. 4 GiB target DRAM (Corigine MimicTurbo GT).
-class FireSimMxFp4VpuGemminiRocketConfig extends Config(
-  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++ // 4 GiB
-  new WithDefaultFireSimBridges ++
-  new WithFireSimConfigTweaks ++
-  new chipyard.MxFp4VpuGemminiRocketConfig)
-
 // FP6 E3M2 only (LUT) with the VPU and SPAD_REQUANT; 4-bank L2 with 64 DRAM reads in flight:
 // chipyard.MxE3M2VpuGemminiRocketConfig. 4 GiB target DRAM (Corigine MimicTurbo GT).
 class FireSimMxE3M2VpuGemminiRocketConfig extends Config(

@@ -1,10 +1,12 @@
 # HOST-ONLY TEMPLATE -- NOT READY TO DEPLOY.
 #
-# Replace the __REPLACE_* URI values only after the matching 20 MHz TIMING
-# builds and driver bundles exist. The HBM2-2000 condition is a runtime-only
+# Replace the __REPLACE_* URI and SHA-256 values only after the matching 20 MHz
+# TIMING builds and driver bundles exist. The HBM2-2000 condition is a runtime-only
 # alias: custom_runtime_config is an HWDB property, while the anchors force the
 # alias to reuse the exact HBM2-2400 bitstream and driver artifacts. The shared
-# HBM driver bundle must contain both HBM profiles.
+# HBM driver bundle must contain both HBM profiles. Each profile contract pins
+# the exact bytes, model set, and complete per-model setting count consumed by
+# the shared-host manager before launch.
 
 xb10_two_sm_hbm2_frfcfs_20mhz_timing:
     bitstream_tar: &hbm_bitstream "__REPLACE_WITH_HBM_FIRESIM_TAR_GZ_URI__"
@@ -12,6 +14,13 @@ xb10_two_sm_hbm2_frfcfs_20mhz_timing:
     deploy_quintuplet_override: null
     deploy_makefrag_override: null
     custom_runtime_config: hbm2-FRFCFS-2400-OP-REFab-5bridge.conf
+    fased_runtime_profile:
+        sha256: 372af4e4a05a168bcdcc37dd853f6dbf3849b6c3585fc595b31522290f852cf8
+        model_ids: [0, 1, 2, 3, 4]
+        settings_per_model: 34
+    artifact_sha256:
+        bitstream_tar: &hbm_bitstream_sha "__REPLACE_WITH_HBM_FIRESIM_TAR_GZ_SHA256__"
+        driver_tar: &hbm_driver_sha "__REPLACE_WITH_HBM_DRIVER_BUNDLE_TAR_GZ_SHA256__"
 
 xb10_two_sm_hbm2_frfcfs_20mhz_timing_hbm2000_sensitivity:
     bitstream_tar: *hbm_bitstream
@@ -19,6 +28,13 @@ xb10_two_sm_hbm2_frfcfs_20mhz_timing_hbm2000_sensitivity:
     deploy_quintuplet_override: null
     deploy_makefrag_override: null
     custom_runtime_config: hbm2-FRFCFS-2000-OP-REFab-5bridge.conf
+    fased_runtime_profile:
+        sha256: 2d45764907b723a66dc30a4547f9ed10d122a9da8132e5380febac76f80fd5ab
+        model_ids: [0, 1, 2, 3, 4]
+        settings_per_model: 34
+    artifact_sha256:
+        bitstream_tar: *hbm_bitstream_sha
+        driver_tar: *hbm_driver_sha
 
 xb10_two_sm_ddr3_frfcfs_20mhz_timing:
     bitstream_tar: "__REPLACE_WITH_DDR_FIRESIM_TAR_GZ_URI__"
@@ -26,3 +42,10 @@ xb10_two_sm_ddr3_frfcfs_20mhz_timing:
     deploy_quintuplet_override: null
     deploy_makefrag_override: null
     custom_runtime_config: ddr3-FRFCFS-8G-4R-2133-OP-5bridge.conf
+    fased_runtime_profile:
+        sha256: dc133659c8f8e4a8cfd14e6779a373bbcb005cc7143507320d1edf5e1014fc6a
+        model_ids: [0, 1, 2, 3, 4]
+        settings_per_model: 28
+    artifact_sha256:
+        bitstream_tar: "__REPLACE_WITH_DDR_FIRESIM_TAR_GZ_SHA256__"
+        driver_tar: "__REPLACE_WITH_DDR_DRIVER_BUNDLE_TAR_GZ_SHA256__"

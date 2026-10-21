@@ -7,6 +7,18 @@
 firechip_lib_dir = $(chipyard_dir)/generators/firechip/bridgestubs/src/main/cc
 testchipip_csrc_dir = $(chipyard_dir)/generators/testchipip/src/main/resources/testchipip/csrc
 
+# FESVR is a host-side driver dependency. Allow it to live outside the target
+# cross-toolchain while retaining the historical RISCV-based default.
+FIRESIM_FESVR_PREFIX ?= $(RISCV)
+ifeq (,$(strip $(FIRESIM_FESVR_PREFIX)))
+FIRESIM_FESVR_PREFIX := $(RISCV)
+endif
+FIRESIM_FESVR_ARCHIVE := $(FIRESIM_FESVR_PREFIX)/lib/libfesvr.a
+
+ifeq (,$(wildcard $(FIRESIM_FESVR_ARCHIVE)))
+$(error FireSim host FESVR archive not found: $(FIRESIM_FESVR_ARCHIVE))
+endif
+
 # DRIVER_H only used to update recipe pre-reqs (ok to track more files)
 
 # fesvr and related srcs
@@ -17,15 +29,15 @@ DRIVER_CC += \
 		$(testchipip_csrc_dir)/testchip_tsi.cc \
 		$(testchipip_csrc_dir)/testchip_htif.cc \
 		$(firechip_lib_dir)/fesvr/firesim_tsi.cc \
-		$(RISCV)/lib/libfesvr.a
+		$(FIRESIM_FESVR_ARCHIVE)
 # Disable missing override warning for testchipip.
 TARGET_CXX_FLAGS += \
 		-isystem $(testchipip_csrc_dir) \
-		-isystem $(RISCV)/include \
+		-isystem $(FIRESIM_FESVR_PREFIX)/include \
 		-Wno-inconsistent-missing-override
 TARGET_LD_FLAGS += \
-		-L$(RISCV)/lib \
-		-Wl,-rpath,$(RISCV)/lib
+		-L$(FIRESIM_FESVR_PREFIX)/lib \
+		-Wl,-rpath,$(FIRESIM_FESVR_PREFIX)/lib
 
 # top-level testing sources
 DRIVER_H += $(shell find $(firechip_lib_dir)/bridges/test -name "*.h")

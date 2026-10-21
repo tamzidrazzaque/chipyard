@@ -1,5 +1,55 @@
 schema_version: 1
 
+# Detached, reviewable provenance for deployment-ready artifacts.  The source
+# commits that already exist are pinned here.  Keep every __REPLACE_* value in
+# this checked-in pre-build template; fill a separate campaign copy only after
+# the final clean parent commit and post-source-fix Golden Gate outputs exist.
+# In particular, do not fill these generated hashes from the earlier
+# pre-Gemmini-fix snapshot.
+artifact_provenance:
+    schema_version: 1
+    source_commits:
+        chipyard: "__REPLACE_WITH_FINAL_CLEAN_CHIPYARD_BUILD_COMMIT__"
+        firesim: 590ebc4e7e1061a7b96bb333b7c692701a791bac
+        radiance: bd6c4b7af8fc90b939061862baa35c2f200899cd
+        fesvr_spike: 9c190a07c6838f6392bafa4ad83acea462c7f759
+    workload_build:
+        radiance_kernels_checkout: e2d3c9f881709951ca2e62f1b2a4fbbcae3515b8
+        kernel_revision: d0cc00b286f5f3b6de6238857746ffca3f83838b
+        llvm_source_revision: d2f676d746659a79902328d77371d9f136aace65
+        mxgemmini_revision: 6fc8ec79bc828b33628ec951bfa1d0f65278a338
+    host_dependencies:
+        fesvr_prefix: /scratch/trazzaque/tools/spike-host-9c190a07c683-noboost
+        libfesvr_a_sha256: 251b001beb6a387f306ee86e58dc69d013c452c30eea8ad069097c5b39d82867
+        libriscv_so_sha256: e6c85d5a37d9e34eebb405c89f71aca6125d32ae0b1e0e18e7dad7290ea933ef
+        include_tree_sha256: a15648d7dcedaba7a061218a420fe65eddc4688493b31f33e98a752c79258a49
+    generated_output_sha256:
+        hbm:
+            target_fir: "__REPLACE_WITH_POST_FIX_HBM_TARGET_FIR_SHA256__"
+            target_annotations: "__REPLACE_WITH_POST_FIX_HBM_TARGET_ANNOTATIONS_SHA256__"
+            generated_sv: "__REPLACE_WITH_POST_FIX_HBM_GENERATED_SV_SHA256__"
+            generated_defines_vh: "__REPLACE_WITH_POST_FIX_HBM_GENERATED_DEFINES_VH_SHA256__"
+            generated_const_h: "__REPLACE_WITH_POST_FIX_HBM_GENERATED_CONST_H_SHA256__"
+            synthesis_xdc: "__REPLACE_WITH_POST_FIX_HBM_SYNTHESIS_XDC_SHA256__"
+            implementation_xdc: "__REPLACE_WITH_POST_FIX_HBM_IMPLEMENTATION_XDC_SHA256__"
+            post_bridge_extraction: "__REPLACE_WITH_POST_FIX_HBM_POST_BRIDGE_EXTRACTION_SHA256__"
+        ddr:
+            target_fir: "__REPLACE_WITH_POST_FIX_DDR_TARGET_FIR_SHA256__"
+            target_annotations: "__REPLACE_WITH_POST_FIX_DDR_TARGET_ANNOTATIONS_SHA256__"
+            generated_sv: "__REPLACE_WITH_POST_FIX_DDR_GENERATED_SV_SHA256__"
+            generated_defines_vh: "__REPLACE_WITH_POST_FIX_DDR_GENERATED_DEFINES_VH_SHA256__"
+            generated_const_h: "__REPLACE_WITH_POST_FIX_DDR_GENERATED_CONST_H_SHA256__"
+            synthesis_xdc: "__REPLACE_WITH_POST_FIX_DDR_SYNTHESIS_XDC_SHA256__"
+            implementation_xdc: "__REPLACE_WITH_POST_FIX_DDR_IMPLEMENTATION_XDC_SHA256__"
+            post_bridge_extraction: "__REPLACE_WITH_POST_FIX_DDR_POST_BRIDGE_EXTRACTION_SHA256__"
+    artifact_sha256:
+        hbm:
+            bitstream_tar: "__REPLACE_WITH_HBM_FIRESIM_TAR_GZ_SHA256__"
+            driver_tar: "__REPLACE_WITH_HBM_DRIVER_BUNDLE_TAR_GZ_SHA256__"
+        ddr:
+            bitstream_tar: "__REPLACE_WITH_DDR_FIRESIM_TAR_GZ_SHA256__"
+            driver_tar: "__REPLACE_WITH_DDR_DRIVER_BUNDLE_TAR_GZ_SHA256__"
+
 loading_contract:
     manager_argument: +prog0
     mechanism: fesvr-elf-via-firesim-loadmem
@@ -57,6 +107,10 @@ run_rule:
     alternate_runtime_condition_order_across_run_blocks_when_practical: true
     retain_every_correctness_result: true
     silent_retry_or_discard: forbidden
+    post_run_completeness_gate: validate_xb10_runtime_configs.py --captured-result-dir CONDITION=/absolute/path
+    require_all_seven_simoutputs_before_counting: true
+    require_terminal_memory_stats_rows_before_counting: true
+    require_successful_simulator_exit_before_counting: true
     case_count: 9
     physical_bitstream_count: 2
     runtime_condition_count: 3
