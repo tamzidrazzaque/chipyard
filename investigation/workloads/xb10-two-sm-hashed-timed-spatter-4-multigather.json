@@ -1,0 +1,8 @@
+{
+  "benchmark_name": "xb10-two-sm-hashed-timed-spatter-4-multigather",
+  "common_bootbinary": "../../../../../../radiance-kernels/kernels/spatter/runs/two-sm-native/hashed/timed/case-4-multigather/kernel.soc.elf",
+  "common_rootfs": null,
+  "common_outputs": [],
+  "common_simulation_outputs": ["uartlog"],
+  "common_simulation_inputs": []
+}

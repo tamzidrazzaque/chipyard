@@ -1,0 +1,8 @@
+{
+  "benchmark_name": "xb10-two-sm-hashed-timed-stream-scale",
+  "common_bootbinary": "../../../../../../radiance-kernels/kernels/stream/runs/two-sm-native/hashed/timed/scale/kernel.soc.elf",
+  "common_rootfs": null,
+  "common_outputs": [],
+  "common_simulation_outputs": ["uartlog"],
+  "common_simulation_inputs": []
+}

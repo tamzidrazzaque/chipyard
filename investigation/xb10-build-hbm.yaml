@@ -1,0 +1,14 @@
+# Run this build independently. A single externally-provisioned localhost cannot
+# host both builds concurrently in FireSim's build-farm dispatcher.
+build_farm:
+    base_recipe: build-farm-recipes/externally_provisioned.yaml
+    recipe_arg_overrides:
+        default_build_dir: /scratch/trazzaque/firesim-buildfarm
+        build_farm_hosts:
+            - localhost
+
+builds_to_run:
+    - xb10_two_sm_hbm2_frfcfs_20mhz_timing
+
+agfis_to_share: []
+share_with_accounts: {}

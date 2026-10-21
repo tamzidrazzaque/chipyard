@@ -1,0 +1,59 @@
+# HOST-ONLY TEMPLATE -- DO NOT RUN infrasetup/boot/runworkload from this file.
+# This runtime-only 1 ns-aligned sensitivity reuses the exact HBM2-2400
+# bitstream and driver. Its logical HWDB alias exists only because FireSim puts
+# custom_runtime_config in the HWDB rather than the runtime YAML.
+
+run_farm:
+    base_recipe: run-farm-recipes/externally_provisioned.yaml
+    recipe_arg_overrides:
+        default_platform: CorigineXB10InstanceDeployManager
+        default_simulation_dir: /scratch/trazzaque/firesim-runs/xb10-controlled-pair
+        default_fpga_db: "__REPLACE_WITH_COORDINATED_ONE_ENTRY_FPGA_DB_JSON__"
+        run_farm_hosts_to_use:
+            - localhost: xb10_controlled_single_slot
+        run_farm_host_specs:
+            - xb10_controlled_single_slot:
+                num_fpgas: 1
+                num_metasims: 0
+                use_for_switch_only: false
+
+metasimulation:
+    metasimulation_enabled: false
+    metasimulation_host_simulator: verilator
+    metasimulation_only_plusargs: ""
+    metasimulation_only_vcs_plusargs: ""
+
+target_config:
+    topology: no_net_config
+    no_net_num_nodes: 1
+    link_latency: 6405
+    switching_latency: 10
+    net_bandwidth: 200
+    profile_interval: -1
+    default_hw_config: xb10_two_sm_hbm2_frfcfs_20mhz_timing_hbm2000_sensitivity
+    plusarg_passthrough: ""
+
+tracing:
+    enable: no
+    output_format: 0
+    selector: 1
+    start: 0
+    end: -1
+
+autocounter:
+    read_rate: 0
+
+workload:
+    # Audit sentinel only. Select exactly one campaign workload per invocation.
+    workload_name: ../../../../investigation/workloads/xb10-two-sm-hashed-timed-stream-copy.json
+    terminate_on_completion: no
+    suffix_tag: xb10-hbm2000-template
+
+host_debug:
+    zero_out_dram: no
+    disable_synth_asserts: no
+
+synth_print:
+    start: 0
+    end: -1
+    cycle_prefix: yes

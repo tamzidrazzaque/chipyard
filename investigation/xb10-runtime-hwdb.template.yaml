@@ -1,0 +1,28 @@
+# HOST-ONLY TEMPLATE -- NOT READY TO DEPLOY.
+#
+# Replace the __REPLACE_* URI values only after the matching 20 MHz TIMING
+# builds and driver bundles exist. The HBM2-2000 condition is a runtime-only
+# alias: custom_runtime_config is an HWDB property, while the anchors force the
+# alias to reuse the exact HBM2-2400 bitstream and driver artifacts. The shared
+# HBM driver bundle must contain both HBM profiles.
+
+xb10_two_sm_hbm2_frfcfs_20mhz_timing:
+    bitstream_tar: &hbm_bitstream "__REPLACE_WITH_HBM_FIRESIM_TAR_GZ_URI__"
+    driver_tar: &hbm_driver "__REPLACE_WITH_HBM_DRIVER_BUNDLE_TAR_GZ_URI__"
+    deploy_quintuplet_override: null
+    deploy_makefrag_override: null
+    custom_runtime_config: hbm2-FRFCFS-2400-OP-REFab-5bridge.conf
+
+xb10_two_sm_hbm2_frfcfs_20mhz_timing_hbm2000_sensitivity:
+    bitstream_tar: *hbm_bitstream
+    driver_tar: *hbm_driver
+    deploy_quintuplet_override: null
+    deploy_makefrag_override: null
+    custom_runtime_config: hbm2-FRFCFS-2000-OP-REFab-5bridge.conf
+
+xb10_two_sm_ddr3_frfcfs_20mhz_timing:
+    bitstream_tar: "__REPLACE_WITH_DDR_FIRESIM_TAR_GZ_URI__"
+    driver_tar: "__REPLACE_WITH_DDR_DRIVER_BUNDLE_TAR_GZ_URI__"
+    deploy_quintuplet_override: null
+    deploy_makefrag_override: null
+    custom_runtime_config: ddr3-FRFCFS-8G-4R-2133-OP-5bridge.conf
