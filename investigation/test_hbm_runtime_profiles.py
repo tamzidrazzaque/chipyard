@@ -37,8 +37,8 @@ class HBMRuntimeProfilesTest(unittest.TestCase):
         "tRAS", "tRC", "tRTP", "tWR", "tREFI", "tRFC", "tRFCSB", "tRREFD",
     ]
 
-    def read_profile(self, grade: str) -> dict[str, str]:
-        path = HERE / "runtime-configs" / f"hbm2-FRFCFS-{grade}-OP-REFab.source.conf"
+    def read_profile(self, grade: str, refresh: str = "REFab") -> dict[str, str]:
+        path = HERE / "runtime-configs" / f"hbm2-FRFCFS-{grade}-OP-{refresh}.source.conf"
         return dict(expander.parse_settings(path.read_text(encoding="utf-8").splitlines()))
 
     def read_scala_table(self, grade: str) -> dict[str, str]:
@@ -81,6 +81,34 @@ class HBMRuntimeProfilesTest(unittest.TestCase):
                 for name, value in settings
             ]
             self.assertEqual(expander.expand(settings, range(5)).splitlines(), expected)
+
+    def test_2400_profile_converted_to_one_ghz_ticks(self) -> None:
+        raw = self.read_profile("2400")
+        converted = self.read_profile("2400-1GHz")
+        self.assertEqual(set(converted), set(raw))
+        for key, value in raw.items():
+            if key == "hbmTimings_tREFI":
+                # A refresh interval is a maximum, so never round it upward.
+                self.assertEqual(converted[key], "3900")
+            elif key.startswith("hbmTimings_"):
+                self.assertEqual(int(converted[key]), (int(value) * 5 + 5) // 6, key)
+            else:
+                self.assertEqual(converted[key], value, key)
+
+    def test_integer_tick_2400_profile_cannot_express_faster_minimums_than_2000(self) -> None:
+        converted = self.read_profile("2400-1GHz")
+        aligned = self.read_profile("2000")
+        for key in converted:
+            if key.startswith("hbmTimings_") and key != "hbmTimings_tREFI":
+                self.assertGreaterEqual(int(converted[key]), int(aligned[key]), key)
+        self.assertEqual(converted["hbmTimings_tREFI"], aligned["hbmTimings_tREFI"])
+
+    def test_2000_refsb_changes_only_refresh_policy(self) -> None:
+        refab = self.read_profile("2000")
+        refsb = self.read_profile("2000", refresh="REFSB")
+        expected = dict(refab)
+        expected["perBankRefresh"] = "1"
+        self.assertEqual(refsb, expected)
 
 
 if __name__ == "__main__":

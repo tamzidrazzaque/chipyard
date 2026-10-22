@@ -27,7 +27,9 @@ class ExpandedRuntimeProfilesTest(unittest.TestCase):
     def test_outputs_are_exact_expansions_for_annotation_model_ids(self) -> None:
         profiles = [
             "hbm2-FRFCFS-2400-OP-REFab",
+            "hbm2-FRFCFS-2400-1GHz-OP-REFab",
             "hbm2-FRFCFS-2000-OP-REFab",
+            "hbm2-FRFCFS-2000-OP-REFSB",
             "ddr3-FRFCFS-8G-4R-2133-OP",
         ]
         self.assertEqual(self.model_ids, [0, 1, 2, 3, 4])
