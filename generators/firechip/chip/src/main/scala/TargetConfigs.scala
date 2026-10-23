@@ -427,6 +427,14 @@ class FireSimE4M3MxGemminiTwoClusterHBMRadianceConfig extends Config(
   new WithFireSimConfigTweaks ++
   new chipyard.RadianceE4M3MxGemminiTwoClusterHBMConfig)
 
+// Apply RadianceHBMConfig's request depths to the same two-SM FireSim target.
+// Compare DDR and HBM with this target class held constant; U250 fit is unproven.
+class FireSimE4M3MxGemminiTwoClusterHBMHighDepthRadianceConfig extends Config(
+  new radiance.memory.WithMemParallelism(
+    l0dInFlight = Some(8), l0dMSHRs = Some(8),
+    l1InFlight = Some(32), l1MSHRs = Some(32)) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceConfig)
+
 class FireSimE4M3MxGemminiFourClusterHBMRadianceConfig extends Config(
   new WithGPUDefaultResetHeld ++
   new radiance.subsystem.WithRadianceSimParams(false) ++
