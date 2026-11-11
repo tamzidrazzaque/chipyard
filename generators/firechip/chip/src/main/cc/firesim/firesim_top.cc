@@ -25,6 +25,8 @@ private:
   peek_poke_t &peek_poke;
   /// Flag to indicate that the simulation was terminated.
   bool terminated = false;
+  /// Set by +profile-interval; also enables a final profile at the end of the run.
+  std::optional<uint64_t> profile_interval;
 };
 
 firesim_top_t::firesim_top_t(simif_t &simif,
@@ -48,6 +50,8 @@ firesim_top_t::firesim_top_t(simif_t &simif,
 
   registry.add_widget(
       new heartbeat_t(simif, registry.get_widget<clockmodule_t>(), args));
+
+  this->profile_interval = profile_interval;
 
   // Add functions you'd like to periodically invoke on a paused simulator here.
   if (profile_interval) {
@@ -77,6 +81,12 @@ int firesim_top_t::simulation_run() {
           break;
         }
       }
+    }
+  }
+  // Final sample, so the stats files end with the totals at termination rather than at the last interval.
+  if (profile_interval) {
+    for (auto &mod : registry.get_bridges<FASEDMemoryTimingModel>()) {
+      mod->profile();
     }
   }
   return exit_code;

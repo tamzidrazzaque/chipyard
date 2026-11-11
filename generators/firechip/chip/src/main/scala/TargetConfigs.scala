@@ -441,6 +441,144 @@ class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BConfig extends Config(
   new chipyard.WithDRAMChannelBeatBytes(32) ++
   new FireSimE4M3MxGemminiTwoClusterHBMRadianceConfig)
 
+// Deeper load path for every cluster Gemmini: inFlight DMA requests (max_in_flight_mem_reqs, 64 in
+// GemminiMxFPConfigs.e4m3SingleNoLutMxFPConfig), and 32-entry load reservation station and load command queue (8 and 8
+// in the MX defaults; 32 RS entries as in the VPU builds). Software is unchanged: none of these are in the Gemmini header.
+class WithRadianceGemminiDeepLoads(inFlight: Int) extends Config((site, here, up) => {
+  case TilesLocated(loc @ InCluster(_)) => up(TilesLocated(loc)).map {
+    case a @ radiance.cluster.GemminiTileAttachParams(t: radiance.cluster.MxGemminiTileParams, _) =>
+      a.copy(tileParams = t.copy(mxGemminiConfig = t.mxGemminiConfig.copy(
+        max_in_flight_mem_reqs = inFlight, reservation_station_entries_ld = 32, ld_queue_length = 32)))
+    case other => other
+  }
+})
+
+// Mem32B with the deeper Gemmini load path, 64 or 128 DMA requests in flight per Gemmini
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64Config extends Config(
+  new WithRadianceGemminiDeepLoads(64) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BConfig)
+
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma128Config extends Config(
+  new WithRadianceGemminiDeepLoads(128) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BConfig)
+
+// GPU L2 MSHRs: n outer (memory-side) MSHRs per GPU slice, against 40 from RadianceBaseConfig's
+// WithInclusiveCache(outerLatencyCycles = 40); the host L2 keeps its 40. Each slice also has one MSHR each for B and C.
+// The split L2's inner crossbar gives each slice a power-of-two sink range, so the serial-TL sink field
+// (WithSerialTLSinkBits in WithRadianceHBM) widens to match.
+class WithRadianceGPUL2OuterMSHRs(n: Int) extends Config((site, here, up) => {
+  case radiance.subsystem.SplitL2Key => up(radiance.subsystem.SplitL2Key).map(l2 => l2.copy(caches = l2.caches.map(c =>
+    if (c.name == "gpu") c.copy(outerMSHRs = Some(n)) else c)))
+  case testchipip.serdes.SerialTLKey => {
+    val l2 = site(radiance.subsystem.SplitL2Key).get
+    val hostMemCycles = site(InclusiveCacheKey).memCycles
+    val sinks = l2.caches.map(c => c.regions.size * (1 << log2Up(c.outerMSHRs.getOrElse(hostMemCycles) + 2))).sum
+    up(testchipip.serdes.SerialTLKey).map(s => s.copy(bundleParams = s.bundleParams.copy(sinkBits = log2Up(sinks))))
+  }
+})
+
+// Mem32BDma64 with 64 outer MSHRs per GPU L2 slice; use with HBM2FRFCFS16GBQuadChannelReads64, since FASED takes the
+// smaller of its maxReads and the L2's outer MSHRs.
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2M64Config extends Config(
+  new WithRadianceGPUL2OuterMSHRs(64) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64Config)
+
+// Mem32BDma64 and Mem32BDma64L2M64 with 512 sets per GPU L2 slice (128 KiB, 4 ways; 64 KiB, 8 ways = 128 sets above).
+// The L2 runs one miss per set at a time, and with 128 sets a power-of-two row stride puts many of Gemmini's rows in
+// one set: 4096 B rows map rows 8 apart to the same set, so each slice holds about 8 misses however many are waiting.
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512Config extends Config(
+  new chipyard.WithGPUL2Geometry(kBPerSlice = 128, ways = 4) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64Config)
+
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64Config extends Config(
+  new chipyard.WithGPUL2Geometry(kBPerSlice = 128, ways = 4) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2M64Config)
+
+// Mem32BDma64L2S512M64 (the baseline) with the dual-lane Gemmini load DMA (GemminiArrayConfig.dma_dual_lane)
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAConfig extends Config(
+  new radiance.subsystem.WithRadianceGemminiDualLaneDMA ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64Config)
+
+// ...L2S512M64DualDMA with deep Muon memory parallelism (radiance.memory.MemParallelismParams; defaults in parentheses):
+// L0d 16 requests in flight (3) / 16 MSHRs (4), cluster L1 64 in flight (3) / 64 MSHRs (8), coalescer 32 source ids (8)
+// and 16 response entries (8), L0d->L1 reorder depth 32 (16). Each in-flight depth has to cover the round trip
+// (one request per cycle needs depth >= latency), and the GPU L2 round trip is 100-155 cycles under load.
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAMemParConfig extends Config(
+  new radiance.memory.WithMemParallelism(l0dInFlight = Some(16), l0dMSHRs = Some(16), l1InFlight = Some(64),
+    l1MSHRs = Some(64), coalSrcIds = Some(32), coalRespDepth = Some(16), l0dReorderDepth = Some(32)) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAConfig)
+
+// GPU L2 cork: ReleaseAcks ahead of refills on the L2's inner D channel, and 8 queued ReleaseAcks (2). Streaming
+// misses each release a clean victim before acquiring; with refills first, the ReleaseAcks starved and the cork
+// stalled the L2's Releases (outer C 13 % of cycles with Gemmini alone, 29 % with Gemmini + Muon), holding ~10 misses
+// per slice and adding ~50 cycles to every GPU L2 miss.
+class WithRadianceGPUL2CorkReleaseFirst extends Config((site, here, up) => {
+  case radiance.subsystem.SplitL2Key => up(radiance.subsystem.SplitL2Key).map(l2 => l2.copy(caches = l2.caches.map(c =>
+    if (c.name == "gpu") c.copy(cork = freechips.rocketchip.tilelink.TLCacheCorkParams(releaseAckFirst = true, releaseAckQueue = 8))
+    else c)))
+})
+
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAMemParCorkConfig extends Config(
+  new WithRadianceGPUL2CorkReleaseFirst ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAMemParConfig)
+
+// ...MemParCork with 7-bit memory-port AXI IDs (4). Measured: no change in bandwidth; the 4-bit build already had more
+// than 8 reads in flight per channel (FASED's readOutstandingHistogram never counts its last, >8 bin). Use with ...Reads128.
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAMemParCorkId7Config extends Config(
+  new chipyard.WithDRAMChannelIdBits(7) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAMemParCorkConfig)
+
+// GPU L2 slices drop clean victims without a Release (InclusiveCacheMicroParameters.silentCleanEvict): the cork below
+// answers a clean Release with a local ReleaseAck, so on a full L2 each streaming miss spent ~30 cycles evicting before
+// it could send its Acquire (membw: Gemmini alone 59.6 B/cycle on a half-empty L2, 44.4 on a full one).
+class WithRadianceGPUL2SilentCleanEvict extends Config((site, here, up) => {
+  case radiance.subsystem.SplitL2Key => up(radiance.subsystem.SplitL2Key).map(l2 => l2.copy(caches = l2.caches.map(c =>
+    if (c.name == "gpu") c.copy(silentCleanEvict = true) else c)))
+})
+
+// More requests in flight end to end, to cover the ~100-200-cycle GPU memory round trip (Little's law: 128 B/cycle needs
+// ~200 64 B lines in flight; MemParCork keeps ~130):
+// - Gemmini: 128 DMA reads in flight per cluster (64).
+// - Muon: L0d 32 in flight / 32 MSHRs (16 / 16), reorder depth 64 (32), coalescer 64 source ids / 32 responses (32 / 16),
+//   cluster L1 128 MSHRs (64), L1 prefetch 16 lines ahead (8).
+// - GPU L2: 128 outer MSHRs per slice (64), clean victims dropped silently.
+// - Memory ports: 8-bit AXI IDs (128 odd read IDs per channel). Use with ...Reads256 (FASED 256 reads per channel).
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceDeepMemConfig extends Config(
+  new chipyard.WithDRAMChannelIdBits(8) ++
+  new WithRadianceGPUL2OuterMSHRs(128) ++
+  new WithRadianceGPUL2SilentCleanEvict ++
+  new WithRadianceGemminiDeepLoads(128) ++
+  new chipyard.WithL1Prefetch(16) ++
+  new radiance.memory.WithMemParallelism(l0dInFlight = Some(32), l0dMSHRs = Some(32), l1MSHRs = Some(128),
+    coalSrcIds = Some(64), coalRespDepth = Some(32), l0dReorderDepth = Some(64)) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceMem32BDma64L2S512M64DualDMAMemParCorkConfig)
+
+// GPU L2 cork Grant sink ids (TLCacheCorkParams.sinkIds, default 8). Each refill Grant holds one until the L2's GrantAck,
+// which goes out through the slice's scheduler: ~23 cycles under streaming load, so 8 ids allowed ~0.27 refills per cycle
+// per slice (4 slices x 0.27 x 64 B ~ 70 B/cycle). Measured in DeepMem: pool empty 55 % of cycles, HBM read data refused
+// 29 %, with ~49 finished reads waiting per channel. Keeps the cork's other settings.
+class WithRadianceGPUL2CorkSinkIds(n: Int) extends Config((site, here, up) => {
+  case radiance.subsystem.SplitL2Key => up(radiance.subsystem.SplitL2Key).map(l2 => l2.copy(caches = l2.caches.map(c =>
+    if (c.name == "gpu") c.copy(cork = c.cork.copy(sinkIds = n)) else c)))
+})
+
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceDeepMemSink64Config extends Config(
+  new WithRadianceGPUL2CorkSinkIds(64) ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceDeepMemConfig)
+
+// GPU L2 directory with a read and a write port and a pipelined write queue (InclusiveCacheMicroParameters.dirDualPort).
+// The default directory takes at most one write every two cycles (1-entry non-pipe write queue) and none while it reads;
+// an MSHR's refill response waits for its directory write, so each slice ran at ~0.27 misses per cycle (DeepMemSink64:
+// directory write port ready 52 % of cycles, ~14.5 MSHRs per slice blocked on it, ~90 cycles per miss to respond inward).
+class WithRadianceGPUL2DirDualPort extends Config((site, here, up) => {
+  case radiance.subsystem.SplitL2Key => up(radiance.subsystem.SplitL2Key).map(l2 => l2.copy(caches = l2.caches.map(c =>
+    if (c.name == "gpu") c.copy(dirDualPort = true) else c)))
+})
+
+class FireSimE4M3MxGemminiTwoClusterHBMRadianceDeepMemSink64DirDPConfig extends Config(
+  new WithRadianceGPUL2DirDualPort ++
+  new FireSimE4M3MxGemminiTwoClusterHBMRadianceDeepMemSink64Config)
+
 class FireSimE4M3MxGemminiFourClusterHBMRadianceConfig extends Config(
   new WithGPUDefaultResetHeld ++
   new radiance.subsystem.WithRadianceSimParams(false) ++
@@ -545,6 +683,22 @@ class FireSimMxDualA8W4E3M2Dim8GemminiRocketConfig extends Config(
   new WithDefaultFireSimBridges ++
   new WithFireSimConfigTweaks ++
   new chipyard.MxDualA8W4E3M2Dim8GemminiRocketConfig)
+
+// One MX Gemmini (E4M3 + E4M3 QuantLut, 2 VPUs, full BF16 PE arithmetic) on a medium BOOM, 16x16 and 32x32:
+// chipyard.MxE4M3LutBf16Dim{16,32}GemminiBoomConfig (512-bit system bus, 32 B memory bus and DRAM port).
+class FireSimMxE4M3LutBf16Dim16GemminiBoomConfig extends Config(
+  new freechips.rocketchip.subsystem.WithEdgeDataBits(256) ++
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++ // 4 GiB
+  new WithDefaultFireSimBridges ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.MxE4M3LutBf16Dim16GemminiBoomConfig)
+
+class FireSimMxE4M3LutBf16Dim32GemminiBoomConfig extends Config(
+  new freechips.rocketchip.subsystem.WithEdgeDataBits(256) ++
+  new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++ // 4 GiB
+  new WithDefaultFireSimBridges ++
+  new WithFireSimConfigTweaks ++
+  new chipyard.MxE4M3LutBf16Dim32GemminiBoomConfig)
 
 // class FireSimBF16Dim8GemminiRocketConfig extends Config(
 //   new freechips.rocketchip.subsystem.WithExtMemSize(BigInt(1) << 32) ++ // 4 GiB
